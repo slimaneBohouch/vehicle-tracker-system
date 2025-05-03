@@ -70,6 +70,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount routers
 app.use('/api/v1/auth', auth);
+
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+});
+
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+
+
 // Mount the vehicle routes
 app.use('/api/v1/vehicles', vehicleRoutes);
 // Mount additional routes here as they are created

@@ -55,7 +55,7 @@ const vehicleSchema = new mongoose.Schema({
   immobilizationHistory: [
     {
       status: {
-        type: Boolean, // true = immobilized, false = mobilized
+        type: Boolean,
         required: true
       },
       timestamp: {

@@ -86,6 +86,10 @@ exports.updateDetails = asyncHandler(async (req, res, next) => {
     company: req.body.company
   };
 
+  if (req.file) {
+    fieldsToUpdate.photo = `/uploads/${req.file.filename}`;
+  }
+
   // Filter out undefined fields
   Object.keys(fieldsToUpdate).forEach(key => 
     fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
