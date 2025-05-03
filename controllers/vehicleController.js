@@ -149,16 +149,19 @@ exports.getUserVehicles = catchAsync(async (req, res, next) => {
 
   // Merge external data into vehicles
   const enrichedVehicles = vehicles.map(vehicle => {
-    const device = externalDevices.find(dev => dev.IMEI === vehicle.imei);
+    const device = externalDevices.find(
+      dev => dev.IMEI?.toString().trim() === vehicle.imei?.toString().trim()
+    );
+   
     return {
       ...vehicle.toObject(),
       telemetry: {
-        vehicleBattery: device?.extendedData?.vehicleBattery ?? null,
-        ignition: device?.extendedData?.ignition ?? null,
-        speed: device?.extendedData?.speed ?? null,
-      },
+        vehicleBattery: device?.extendedData?.vehicleBattery,
+        ignition: device?.ignition,
+        speed: device?.speed,
+      }        
     };
-  });
+  }); 
 
   res.status(200).json({
     status: 'success',
