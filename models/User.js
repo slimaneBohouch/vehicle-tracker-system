@@ -22,10 +22,7 @@ const UserSchema = new mongoose.Schema({
     minlength: 6,
     select: false
   },
-  phone: {
-    type: String,
-    match: [/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/, 'Please add a valid phone number']
-  },
+  
   company: {
     type: String
   },
