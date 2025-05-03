@@ -8,7 +8,7 @@ const sendEmail = require('../Utils/sendEmail');
 // @route   POST /api/v1/auth/register
 // @access  Public
 exports.register = asyncHandler(async (req, res, next) => {
-  const { name, email, password, phone, company, role } = req.body;
+  const { name, email, password, company } = req.body;
 
   // Create user
   const user = await User.create({
@@ -85,6 +85,10 @@ exports.updateDetails = asyncHandler(async (req, res, next) => {
     email: req.body.email,
     company: req.body.company
   };
+
+  if (req.file) {
+    fieldsToUpdate.photo = `/uploads/${req.file.filename}`;
+  }
 
   // Filter out undefined fields
   Object.keys(fieldsToUpdate).forEach(key => 

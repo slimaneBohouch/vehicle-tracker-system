@@ -137,11 +137,37 @@ exports.addVehicle = catchAsync(async (req, res, next) => {
 exports.getUserVehicles = catchAsync(async (req, res, next) => {
   const vehicles = await Vehicle.find({ user: req.user.id });
 
+  // Fetch external device data
+  let externalDevices = [];
+  try {
+    const externalResponse = await axios.get('http://www.pogog.ovh:5051/devices');
+    externalDevices = Array.isArray(externalResponse.data) ? externalResponse.data : [];
+  } catch (error) {
+    console.error("Failed to fetch external devices:", error.message);
+    // Proceed with internal data only
+  }
+
+  // Merge external data into vehicles
+  const enrichedVehicles = vehicles.map(vehicle => {
+    const device = externalDevices.find(
+      dev => dev.IMEI?.toString().trim() === vehicle.imei?.toString().trim()
+    );
+   
+    return {
+      ...vehicle.toObject(),
+      telemetry: {
+        vehicleBattery: device?.extendedData?.vehicleBattery,
+        ignition: device?.ignition,
+        speed: device?.speed,
+      }        
+    };
+  }); 
+
   res.status(200).json({
     status: 'success',
-    results: vehicles.length,
+    results: enrichedVehicles.length,
     data: {
-      vehicles
+      vehicles: enrichedVehicles
     }
   });
 });

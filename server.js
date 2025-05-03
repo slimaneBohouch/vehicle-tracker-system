@@ -59,18 +59,32 @@ app.use(limiter);
 app.use(hpp());
 
 // Enable CORS
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173", 
+  credentials: true
+}));
+app.options('*', cors());
 
 // Set static folder
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount routers
 app.use('/api/v1/auth', auth);
+
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+});
+
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+
+
 // Mount the vehicle routes
 app.use('/api/v1/vehicles', vehicleRoutes);
 // Mount additional routes here as they are created
 // app.use('/api/v1/tracking', tracking);
-
 // Error handler middleware (must be after route mounting)
 app.use(errorHandler);
 
@@ -79,13 +93,6 @@ const PORT = process.env.PORT || 5000;
 const server = app.listen(
   PORT,
   console.log(
-    `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold
+    `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.blue.bold
   )
 );
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-  console.log(`Error: ${err.message}`.red);
-  // Close server & exit process
-  server.close(() => process.exit(1));
-});
