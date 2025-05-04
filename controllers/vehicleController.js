@@ -159,6 +159,8 @@ exports.getUserVehicles = catchAsync(async (req, res, next) => {
         vehicleBattery: device?.extendedData?.vehicleBattery,
         ignition: device?.ignition,
         speed: device?.speed,
+        lat: device?.lat,
+        lon: device?.lon
       }        
     };
   }); 
