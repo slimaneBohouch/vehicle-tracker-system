@@ -134,35 +134,6 @@ exports.addVehicle = catchAsync(async (req, res, next) => {
  * Get all vehicles belonging to the current user
  * GET /api/vehicles
  */
-const reverseGeocode = async (lat, lon) => {
-  try {
-    const res = await axios.get("https://nominatim.openstreetmap.org/reverse", {
-      params: {
-        lat,
-        lon,
-        format: "json"
-      },
-      headers: {
-        "User-Agent": "YourAppName/1.0 (your@email.com)" // Respect Nominatim policy
-      }
-    });
-
-    const address = res.data.address;
-    return (
-      address?.city ||
-      address?.town ||
-      address?.village ||
-      address?.county ||
-      address?.state ||
-      "Unknown"
-    );
-  } catch (err) {
-    console.error("Reverse geocoding failed:", err.message);
-    return "Unknown";
-  }
-};
-
-// Controller
 exports.getUserVehicles = catchAsync(async (req, res, next) => {
   const vehicles = await Vehicle.find({ user: req.user.id });
 
@@ -173,35 +144,26 @@ exports.getUserVehicles = catchAsync(async (req, res, next) => {
     externalDevices = Array.isArray(externalResponse.data) ? externalResponse.data : [];
   } catch (error) {
     console.error("Failed to fetch external devices:", error.message);
-    // Continue with internal data only
+    // Proceed with internal data only
   }
 
-  // Merge external data into vehicles + add reverse geocoded location
-  const enrichedVehicles = await Promise.all(
-    vehicles.map(async (vehicle) => {
-      const device = externalDevices.find(
-        (dev) => dev.IMEI?.toString().trim() === vehicle.imei?.toString().trim()
-      );
-
-      const lat = device?.lat ?? 0;
-      const lon = device?.lon ?? 0;
-
-      const locationName =
-        lat !== 0 && lon !== 0 ? await reverseGeocode(lat, lon) : "Unavailable";
-
-      return {
-        ...vehicle.toObject(),
-        telemetry: {
-          vehicleBattery: device?.extendedData?.vehicleBattery,
-          ignition: device?.ignition,
-          speed: device?.speed,
-          lat,
-          lon
-        },
-        locationName
-      };
-    })
-  );
+  // Merge external data into vehicles
+  const enrichedVehicles = vehicles.map(vehicle => {
+    const device = externalDevices.find(
+      dev => dev.IMEI?.toString().trim() === vehicle.imei?.toString().trim()
+    );
+   
+    return {
+      ...vehicle.toObject(),
+      telemetry: {
+        vehicleBattery: device?.extendedData?.vehicleBattery,
+        ignition: device?.ignition,
+        speed: device?.speed,
+        lat: device?.lat,
+        lon: device?.lon
+      }        
+    };
+  }); 
 
   res.status(200).json({
     status: 'success',
