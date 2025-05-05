@@ -15,7 +15,7 @@ const sendEmail = async ({ email, subject, message }) => {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
     to: email,
     subject: subject,
-    text: message,
+    html: message,
   };
 
   try {
