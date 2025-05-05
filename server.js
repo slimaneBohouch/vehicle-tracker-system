@@ -60,7 +60,7 @@ app.use(hpp());
 
 // Enable CORS
 app.use(cors({
-  origin: "http://localhost:5173", 
+  origin: process.env.FRONTEND_URL, 
   credentials: true
 }));
 app.options('*', cors());
@@ -73,14 +73,10 @@ app.use('/api/v1/auth', auth);
 
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
   setHeaders: (res, path) => {
-    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL);
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   }
 }));
-
-
-
-
 
 // Mount the vehicle routes
 app.use('/api/v1/vehicles', vehicleRoutes);
