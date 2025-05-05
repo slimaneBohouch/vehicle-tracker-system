@@ -147,12 +147,59 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
 
   await user.save({ validateBeforeSave: false });
 
-  // Create reset url
-  const resetUrl = `${req.protocol}://${req.get(
-    'host'
-  )}/api/v1/auth/resetpassword/${resetToken}`;
+// Create reset URL that points to your frontend
+const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-  const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
+
+const message = `
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center">
+          <table width="600" cellpadding="20" cellspacing="0" style="background-color: #ffffff; border-radius: 6px;">
+            <tr>
+              <td>
+                <h2 style="color: #333;">Hello ${user.name},</h2>
+                <p style="color: #555; font-size: 16px;">
+                  You requested a password reset for your <strong>VehicleTracking</strong> account.
+                </p>
+                <p style="color: #555; font-size: 16px;">
+                  Click the button below to reset your password:
+                </p>
+                <p style="text-align: center; margin: 30px 0;">
+                  <a href="${resetUrl}" target="_blank" style="
+                    background-color:rgba(0, 0, 0, 0.81);
+                    color: white;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    border-radius: 4px;
+                    font-weight: bold;
+                  ">
+                    Reset Password
+                  </a>
+                </p>
+                <p style="color: #999; font-size: 14px;">
+                  If you didn’t request this, you can safely ignore this email.
+                </p>
+                <p style="color: #555; font-size: 16px;">
+                  Best regards,<br/>
+                  <strong>VehicleTracking Support Team</strong>
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="color: #aaa; font-size: 12px; margin-top: 10px;">
+            &copy; ${new Date().getFullYear()} VehicleTracking. All rights reserved.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`;
+
 
   try {
     await sendEmail({
