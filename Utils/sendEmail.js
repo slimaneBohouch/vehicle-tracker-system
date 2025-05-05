@@ -1,8 +1,6 @@
 // Utils/sendEmail.js
-
 const nodemailer = require('nodemailer');
 require('dotenv').config();
-
 const sendEmail = async ({ email, subject, message }) => {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
