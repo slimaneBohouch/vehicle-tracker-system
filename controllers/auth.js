@@ -147,12 +147,23 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
 
   await user.save({ validateBeforeSave: false });
 
-  // Create reset url
-  const resetUrl = `${req.protocol}://${req.get(
-    'host'
-  )}/api/v1/auth/resetpassword/${resetToken}`;
+// Create reset URL that points to your frontend
+const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-  const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
+
+  const message = `
+  
+Hello,\n
+
+You requested a password reset for your VehicleTracking account.\n
+
+Please click the link below to reset your password:\n\n ${resetUrl}
+
+If you didn’t request this, you can safely ignore this email.\n
+
+Best regards,  \n
+VehicleTracking Support Team 
+  `;
 
   try {
     await sendEmail({
