@@ -58,76 +58,89 @@ const validateIMEI = async (imei) => {
  * POST /api/v1/vehicles
  */
 exports.addVehicle = catchAsync(async (req, res, next) => {
-    try {
-      let { imei, name, model, licensePlate } = req.body;
-      
-      // Normalize IMEI to uppercase
-      imei = imei.toUpperCase();
-      
-      if (!imei) {
-        return next(new AppError('Please provide device IMEI', 400));
-      }
-      
-      if (!name || !model || !licensePlate) {
-        return next(new AppError('Please provide all required vehicle details', 400));
-      }
-      
-      // Validate IMEI through external API
-      const imeiValidation = await validateIMEI(imei);
-      
-      if (!imeiValidation.valid) {
-        return next(new AppError(imeiValidation.message || 'Invalid IMEI number', 400));
-      }
-      
-      // Check if vehicle with this IMEI already exists
-      const existingVehicle = await Vehicle.findOne({ imei });
-      if (existingVehicle) {
-        return next(new AppError('A vehicle with this IMEI already exists', 400));
-      }
-      
-      // Check if license plate is already in use
-      const existingLicense = await Vehicle.findOne({ licensePlate });
-      if (existingLicense) {
-        return next(new AppError('This license plate is already registered', 400));
-      }
-      
-      const deviceDetails = imeiValidation.details || {};
-      
-      console.log('About to create vehicle with data:', {
-        imei,
-        name: name || deviceDetails.name || 'Unnamed Vehicle',
-        model: model || deviceDetails.model || 'Unknown Model',
-        licensePlate,
-        user: req.user.id,
-        currentStatus: deviceDetails.status || 'inactive',
-      });
-      
-      const vehicle = await Vehicle.create({
-        imei,
-        name: name || deviceDetails.name || 'Unnamed Vehicle',
-        model: model || deviceDetails.model || 'Unknown Model',
-        licensePlate,
-        user: req.user.id,
-        currentStatus: deviceDetails.status || 'inactive',
-      });
-      
-      console.log('Vehicle created successfully with ID:', vehicle._id);
-      
-      // Verify the vehicle was created by immediately querying for it
-      const verifyVehicle = await Vehicle.findById(vehicle._id);
-      console.log('Verification query result:', verifyVehicle ? 'Found' : 'Not found');
-      
-      res.status(201).json({
-        status: 'success',
-        data: {
-          vehicle,
-        },
-      });
-    } catch (error) {
-      console.error('Error in addVehicle:', error);
-      return next(error);
+  try {
+    let { imei, name, model, licensePlate } = req.body;
+    
+    // Normalize IMEI to uppercase
+    imei = imei.toUpperCase();
+    
+    if (!imei) {
+      return next(new AppError('Please provide device IMEI', 400));
     }
-  });
+    
+    if (!name || !model || !licensePlate) {
+      return next(new AppError('Please provide all required vehicle details', 400));
+    }
+    
+    // Validate IMEI through external API
+    const imeiValidation = await validateIMEI(imei);
+    
+    if (!imeiValidation.valid) {
+      return next(new AppError(imeiValidation.message || 'Invalid IMEI number', 400));
+    }
+    
+    // Check if vehicle with this IMEI already exists (by any user)
+    const existingVehicle = await Vehicle.findOne({ imei });
+    if (existingVehicle) {
+      // Check if it belongs to the current user
+      if (existingVehicle.user.toString() === req.user.id) {
+        return next(new AppError('You already have a vehicle registered with this IMEI', 400));
+      } else {
+        // IMEI is registered to another user - this is a security concern
+        console.log(`Security alert: User ${req.user.id} attempted to register IMEI ${imei} which belongs to user ${existingVehicle.user}`);
+        
+        // You could add additional security measures here, like:
+        // 1. Flag the account for review
+        // 2. Send notification to admin
+        // 3. Track failed attempts
+        
+        return next(new AppError('This device IMEI is already registered to another user. This incident has been logged.', 403));
+      }
+    }
+    
+    // Check if license plate is already in use
+    const existingLicense = await Vehicle.findOne({ licensePlate });
+    if (existingLicense) {
+      return next(new AppError('This license plate is already registered', 400));
+    }
+    
+    const deviceDetails = imeiValidation.details || {};
+    
+    console.log('About to create vehicle with data:', {
+      imei,
+      name: name || deviceDetails.name || 'Unnamed Vehicle',
+      model: model || deviceDetails.model || 'Unknown Model',
+      licensePlate,
+      user: req.user.id,
+      currentStatus: deviceDetails.status || 'inactive',
+    });
+    
+    const vehicle = await Vehicle.create({
+      imei,
+      name: name || deviceDetails.name || 'Unnamed Vehicle',
+      model: model || deviceDetails.model || 'Unknown Model',
+      licensePlate,
+      user: req.user.id,
+      currentStatus: deviceDetails.status || 'inactive',
+    });
+    
+    console.log('Vehicle created successfully with ID:', vehicle._id);
+    
+    // Verify the vehicle was created by immediately querying for it
+    const verifyVehicle = await Vehicle.findById(vehicle._id);
+    console.log('Verification query result:', verifyVehicle ? 'Found' : 'Not found');
+    
+    res.status(201).json({
+      status: 'success',
+      data: {
+        vehicle,
+      },
+    });
+  } catch (error) {
+    console.error('Error in addVehicle:', error);
+    return next(error);
+  }
+});
   
 
 /**
