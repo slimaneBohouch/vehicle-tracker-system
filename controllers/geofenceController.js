@@ -228,11 +228,11 @@
  * @access  Private
  */
 exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
-  // 1) load vehicles
+  // 1) Load user's vehicles
   const vehicles = await Vehicle.find({ user: req.user.id });
 
-  // 2) fetch external devices
-let externalDevices = [];
+  // 2) Fetch external device data
+  let externalDevices = [];
   try {
     const externalResponse = await axios.get('http://www.pogog.ovh:5051/devices');
     externalDevices = Array.isArray(externalResponse.data) ? externalResponse.data : [];
@@ -240,18 +240,19 @@ let externalDevices = [];
     console.error("Failed to fetch external devices:", error.message);
     // Proceed with internal data only
   }
-  // 3) enrich with numeric lat/lon—try extendedData first, then fall back to DB fields
+
+  // 3) Enrich each vehicle with lat/lon from API or DB
   const enriched = vehicles.map(v => {
     const dev = externalDevices.find(d =>
-      d.IMEI?.toString().trim() === v.imei?.toString().trim()
+      d.IMEI?.toString().trim().toUpperCase() === v.imei?.toString().trim().toUpperCase()
     );
-  
-    const rawLat = dev?.lat ?? dev?.extendedData?.lat ?? v.lat ?? v.location?.coordinates[1] ?? null;
-    const rawLon = dev?.lon ?? dev?.extendedData?.lon ?? v.lon ?? v.location?.coordinates[0] ?? null;
-  
+
+    const rawLat = dev?.lat ?? dev?.extendedData?.lat ?? v.lat ?? v.location?.coordinates?.[1] ?? null;
+    const rawLon = dev?.lon ?? dev?.extendedData?.lon ?? v.lon ?? v.location?.coordinates?.[0] ?? null;
+
     const lat = rawLat != null ? parseFloat(rawLat) : null;
     const lon = rawLon != null ? parseFloat(rawLon) : null;
-  
+
     return {
       vehicleId: v._id.toString(),
       vehicleName: v.name,
@@ -259,20 +260,37 @@ let externalDevices = [];
       lon
     };
   });
-  
-  // 4) load active geofences
+
+  // 4) Load active geofences
   const geofences = await Geofence.find({ user: req.user.id, active: true });
 
-  // 5) perform checks
+  // 5) For each vehicle, check which of its assigned zones it's inside
   const results = enriched.map(({ vehicleId, vehicleName, lat, lon }) => {
+    const vehicle = vehicles.find(v => v._id.toString() === vehicleId);
 
-    const inside = geofences.filter(g => {
-      if (g.type === 'circle') {
+    const assignedGeofences = geofences.filter(g =>
+      (g.vehicles || []).some(v =>
+        typeof v === 'string' ? v === vehicleId : v.toString() === vehicleId
+      )
+    );
+
+    const inside = [];
+
+    if (lat != null && lon != null) {
+      assignedGeofences.forEach(g => {
         const dist = geoUtils.getDistance(lat, lon, g.center.lat, g.center.lon);
-       
-        return dist <= g.radius;
-      }
-    }).map(g => ({ id: g._id.toString(), name: g.name, type: g.type }));
+    
+      
+        if (dist <= g.radius) {
+          inside.push({
+            id: g._id.toString(),
+            name: g.name,
+            type: g.type
+          });
+        }
+      });
+      
+    }
 
     return { vehicleId, vehicleName, inside };
   });
