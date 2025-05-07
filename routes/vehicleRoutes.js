@@ -7,6 +7,7 @@ const router = express.Router();
 // Protect all routes after this middleware
 router.use(protect);
 
+router.get('/stats', vehicleController.getVehicleStats);
 router
   .route('/')
   .get(vehicleController.getUserVehicles)

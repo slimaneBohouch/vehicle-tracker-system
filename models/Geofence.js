@@ -1,66 +1,75 @@
 const mongoose = require('mongoose');
 
-const geofenceSchema = new mongoose.Schema({
+const GeofenceSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please provide a name for this geofence'],
+    required: true,
     trim: true
   },
   description: {
     type: String,
     trim: true
   },
-  user: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
-    required: true
-  },
   type: {
     type: String,
     enum: ['circle', 'polygon'],
-    default: 'circle'
+    required: true
   },
-  // For circle geofence
-  circle: {
-    center: {
-      type: {
-        type: String,
-        enum: ['Point'],
-        default: 'Point'
-      },
-      coordinates: {
-        type: [Number] // [longitude, latitude]
-      }
-    },
-    radius: {
-      type: Number, // in meters
-      min: 50,
-      max: 10000
-    }
+  // For circular geofences
+  center: {
+    lat: Number,
+    lon: Number
   },
-  // For polygon geofence
-  polygon: {
-    type: {
-      type: String,
-      enum: ['Polygon'],
-      default: 'Polygon'
-    },
-    coordinates: {
-      type: [[[Number]]] // Array of arrays of [longitude, latitude] points
-    }
+  radius: {
+    type: Number,
+    min: 0
   },
-  isActive: {
+  // For polygon geofences
+  coordinates: [{
+    lat: Number,
+    lon: Number
+  }],
+  // Vehicles assigned to this geofence
+  vehicles: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vehicle'
+  }],
+  // User who created this geofence
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  // Active status
+  active: {
     type: Boolean,
     default: true
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  // Notification settings
+  notifyOnExit: {
+    type: Boolean,
+    default: true
+  },
+  notifyOnEntry: {
+    type: Boolean,
+    default: false
   }
+}, {
+  timestamps: true
 });
 
-// Add geospatial indexes for efficient queries
-geofenceSchema.index({ 'circle.center.coordinates': '2dsphere' });
-geofenceSchema.index({ 'polygon.coordinates': '2dsphere' });
+// Validate that circular geofences have center and radius
+GeofenceSchema.pre('save', function(next) {
+  if (this.type === 'circle') {
+    if (!this.center || !this.radius) {
+      return next(new Error('Circular geofences must have center and radius'));
+    }
+  } else if (this.type === 'polygon') {
+    if (!this.coordinates || this.coordinates.length < 3) {
+      return next(new Error('Polygon geofences must have at least 3 coordinates'));
+    }
+  }
+  next();
+});
 
-module.exports = mongoose.model('Geofence', geofenceSchema);
+module.exports = mongoose.model('Geofence', GeofenceSchema);

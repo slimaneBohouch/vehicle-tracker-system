@@ -3,6 +3,7 @@ const User = require('../models/User');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/AppError');
 const axios = require('axios');
+const moment = require('moment');
 
 // Configuration for external IMEI validation API
 const DEVICES_API_URL = process.env.DEVICES_API_URL || 'http://www.pogog.ovh:5051/devices';
@@ -279,5 +280,49 @@ exports.deleteVehicle = catchAsync(async (req, res, next) => {
   res.status(204).json({
     status: 'success',
     data: null
+  });
+});
+
+/**
+ * Get vehicle statistics
+ * GET /api/vehicles/stats
+ */
+exports.getVehicleStats = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+
+  const total = await Vehicle.countDocuments({ user: userId });
+
+  // Define last month date range
+  const lastMonthStart = moment().subtract(1, 'month').startOf('month').toDate();
+  const lastMonthEnd = moment().subtract(1, 'month').endOf('month').toDate();
+
+  // Define current month range
+  const currentMonthStart = moment().startOf('month').toDate();
+  const now = moment().toDate(); // or endOf('month') if you prefer
+
+  // Count vehicles created in last month
+  const lastMonthCount = await Vehicle.countDocuments({
+    user: userId,
+    createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
+  });
+
+  // Count vehicles created in current month
+  const currentMonthCount = await Vehicle.countDocuments({
+    user: userId,
+    createdAt: { $gte: currentMonthStart, $lte: now },
+  });
+
+  // Calculate difference and signed value
+  const rawDiff = currentMonthCount - lastMonthCount;
+  const difference = `${rawDiff >= 0 ? '+' : '-'}${Math.abs(rawDiff)}`;
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      total,
+      lastMonthCount,
+      currentMonthCount,
+      difference,
+    },
   });
 });
