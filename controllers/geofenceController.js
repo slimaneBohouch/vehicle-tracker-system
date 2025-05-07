@@ -3,6 +3,7 @@
   const geoUtils = require('../utils/geoUtils');
   const asyncHandler = require('../middleware/async');
   const ErrorResponse = require('../Utils/errorResponse');
+  const axios = require('axios');
 
   /**
    * @desc    Create a new geofence
@@ -221,69 +222,60 @@
     });
   });
 
-  /**
-   * @desc    Check if a vehicle is inside any geofences
-   * @route   GET /api/geofences/check/:vehicleId
-   * @access  Private
-   */
-  exports.checkVehicleGeofences = asyncHandler(async (req, res, next) => {
-    const { vehicleId } = req.params;
-    
-    // Get the vehicle
-    const vehicle = await Vehicle.findById(vehicleId);
-    
-    if (!vehicle) {
-      return next(
-        new ErrorResponse(`Vehicle not found with id of ${vehicleId}`, 404)
-      );
-    }
-    
-    // Make sure user owns the vehicle
-    if (vehicle.user.toString() !== req.user.id) {
-      return next(
-        new ErrorResponse(`User not authorized to access this vehicle`, 401)
-      );
-    }
-    
-    // Get all geofences for this user
-    const geofences = await Geofence.find({ 
-      user: req.user.id,
-      active: true
-    });
-    
-    // Check which geofences the vehicle is currently in
-    const vehicleLocation = {
-      lat: vehicle.lat,
-      lon: vehicle.lon
+/**
+ * @desc    Check all of the user’s vehicles against all active geofences
+ * @route   GET /api/geofences/check
+ * @access  Private
+ */
+exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
+  // 1) load vehicles
+  const vehicles = await Vehicle.find({ user: req.user.id });
+
+  // 2) fetch external devices
+let externalDevices = [];
+  try {
+    const externalResponse = await axios.get('http://www.pogog.ovh:5051/devices');
+    externalDevices = Array.isArray(externalResponse.data) ? externalResponse.data : [];
+  } catch (error) {
+    console.error("Failed to fetch external devices:", error.message);
+    // Proceed with internal data only
+  }
+  // 3) enrich with numeric lat/lon—try extendedData first, then fall back to DB fields
+  const enriched = vehicles.map(v => {
+    const dev = externalDevices.find(d =>
+      d.IMEI?.toString().trim() === v.imei?.toString().trim()
+    );
+  
+    const rawLat = dev?.lat ?? dev?.extendedData?.lat ?? v.lat ?? v.location?.coordinates[1] ?? null;
+    const rawLon = dev?.lon ?? dev?.extendedData?.lon ?? v.lon ?? v.location?.coordinates[0] ?? null;
+  
+    const lat = rawLat != null ? parseFloat(rawLat) : null;
+    const lon = rawLon != null ? parseFloat(rawLon) : null;
+  
+    return {
+      vehicleId: v._id.toString(),
+      vehicleName: v.name,
+      lat,
+      lon
     };
-      
-    const insideGeofences = [];
-    
-    for (const geofence of geofences) {
-      let isInside = false;
-      
-      if (geofence.type === 'circle') {
-        const distance = geoUtils.getDistance(
-          vehicleLocation.lat,
-          vehicleLocation.lon,
-          geofence.center.lat,
-          geofence.center.lon
-        );
-        isInside = distance <= geofence.radius;
-      } else if (geofence.type === 'polygon') {
-        const point = [vehicleLocation.lat, vehicleLocation.lon];
-        const polygon = geofence.coordinates.map(coord => [coord.lat, coord.lon]);
-        isInside = geoUtils.pointInPolygon(point, polygon);
-      }
-      
-      if (isInside) {
-        insideGeofences.push(geofence);
-      }
-    }
-    
-    res.status(200).json({
-      success: true,
-      count: insideGeofences.length,
-      data: insideGeofences
-    });
   });
+  
+  // 4) load active geofences
+  const geofences = await Geofence.find({ user: req.user.id, active: true });
+
+  // 5) perform checks
+  const results = enriched.map(({ vehicleId, vehicleName, lat, lon }) => {
+
+    const inside = geofences.filter(g => {
+      if (g.type === 'circle') {
+        const dist = geoUtils.getDistance(lat, lon, g.center.lat, g.center.lon);
+       
+        return dist <= g.radius;
+      }
+    }).map(g => ({ id: g._id.toString(), name: g.name, type: g.type }));
+
+    return { vehicleId, vehicleName, inside };
+  });
+
+  res.status(200).json({ success: true, count: results.length, data: results });
+});
