@@ -1,65 +1,48 @@
 const mongoose = require('mongoose');
 
-const alertSchema = new mongoose.Schema({
-  vehicle: {
-    type: mongoose.Schema.ObjectId,
+const AlertSchema = new mongoose.Schema({
+  vehicleId: {
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Vehicle',
-    required: true
-  },
-  user: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
     required: true
   },
   type: {
     type: String,
-    enum: ['geofenceExit', 'geofenceEntry', 'speedExceeded', 'unauthorizedMovement', 'immobilization', 'lowBattery'],
-    required: true
+    required: true,
+    enum: [
+      'SPEED_ALERT', 
+      'BATTERY_ALERT', 
+      'GEOFENCE_EXIT', 
+      'GEOFENCE_ENTRY', 
+      'TIME_RESTRICTION', 
+      'MOVEMENT_ALERT', 
+      'SYSTEM_ALERT'
+    ]
   },
   message: {
     type: String,
     required: true
   },
-  location: {
-    type: {
-      type: String,
-      enum: ['Point'],
-      default: 'Point'
-    },
-    coordinates: {
-      type: [Number] // [longitude, latitude]
-    }
+  data: {
+    type: Object,
+    default: {}
   },
-  speed: {
-    type: Number // If speed-related alert
-  },
-  geofence: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'Geofence' // If geofence-related alert
-  },
-  read: {
+  resolved: {
     type: Boolean,
     default: false
   },
-  notificationSent: {
-    email: {
-      type: Boolean,
-      default: false
-    },
-    sms: {
-      type: Boolean,
-      default: false
-    }
+  resolvedAt: {
+    type: Date
   },
-  createdAt: {
+  timestamp: {
     type: Date,
     default: Date.now
   }
 });
 
-// Add indexes for improved query performance
-alertSchema.index({ vehicle: 1, createdAt: -1 });
-alertSchema.index({ user: 1, read: 1 });
-alertSchema.index({ type: 1 });
+// Index for faster queries
+AlertSchema.index({ vehicleId: 1, timestamp: -1 });
+AlertSchema.index({ type: 1, timestamp: -1 });
+AlertSchema.index({ resolved: 1 });
 
-module.exports = mongoose.model('Alert', alertSchema);
+module.exports = mongoose.model('Alert', AlertSchema);

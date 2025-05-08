@@ -79,32 +79,56 @@ exports.getMe = asyncHandler(async (req, res, next) => {
 // @desc    Update user details
 // @route   PUT /api/v1/auth/updatedetails
 // @access  Private
+const fs = require("fs");
+const path = require("path");
+
 exports.updateDetails = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user.id);
+
   const fieldsToUpdate = {
     name: req.body.name,
     email: req.body.email,
     company: req.body.company
   };
 
+  // Handle uploaded file
   if (req.file) {
+    // Optionally delete the old photo file
+    if (user.photo) {
+      const oldPhotoPath = path.join(__dirname, "..", "public", user.photo);
+      fs.unlink(oldPhotoPath, (err) => {
+        if (err) console.error("Error deleting old photo:", err.message);
+      });
+    }
+
     fieldsToUpdate.photo = `/uploads/${req.file.filename}`;
   }
 
+  // Handle "null" string from frontend to delete the photo
+  if (req.body.photo === "null" && !req.file && user.photo) {
+    const oldPhotoPath = path.join(__dirname, "..", "public", user.photo);
+    fs.unlink(oldPhotoPath, (err) => {
+      if (err) console.error("Error deleting photo:", err.message);
+    });
+    fieldsToUpdate.photo = null;
+  }
+
   // Filter out undefined fields
-  Object.keys(fieldsToUpdate).forEach(key => 
-    fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
+  Object.keys(fieldsToUpdate).forEach(
+    (key) => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
   );
 
-  const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
+  const updatedUser = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
     new: true,
-    runValidators: true
+    runValidators: true,
   });
 
   res.status(200).json({
     success: true,
-    data: user
+    data: updatedUser,
   });
 });
+
 
 // @desc    Update password
 // @route   PUT /api/v1/auth/updatepassword
