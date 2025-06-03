@@ -152,7 +152,7 @@ const Vehicle = require('../models/Vehicle');
     let vehicles;
 
     // Check if the user is an admin
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
       // Admins can see all vehicles
       vehicles = await Vehicle.find();
     } else {
@@ -300,7 +300,7 @@ const Vehicle = require('../models/Vehicle');
     let total, lastMonthCount, currentMonthCount;
 
     // Check if the user is an admin
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
       // Admins can see stats for all vehicles
       total = await Vehicle.countDocuments();
 
