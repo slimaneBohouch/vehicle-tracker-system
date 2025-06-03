@@ -46,8 +46,12 @@ exports.login = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Invalid credentials', 401));
   }
 
+  user.lastActive = new Date();
+  await user.save();
+
   sendTokenResponse(user, 200, res);
 });
+
 
 // @desc    Log user out / clear cookie
 // @route   GET /api/v1/auth/logout
