@@ -1,4 +1,4 @@
-  const Vehicle = require('../models/Vehicle');
+const Vehicle = require('../models/Vehicle');
   const User = require('../models/User');
   const catchAsync = require('../utils/catchAsync');
   const AppError = require('../utils/AppError');
@@ -149,7 +149,16 @@
    * GET /api/vehicles
    */
   exports.getUserVehicles = catchAsync(async (req, res, next) => {
-    const vehicles = await Vehicle.find({ user: req.user.id });
+    let vehicles;
+
+    // Check if the user is an admin
+    if (req.user.role === 'admin') {
+      // Admins can see all vehicles
+      vehicles = await Vehicle.find();
+    } else {
+      // Regular users can only see their own vehicles
+      vehicles = await Vehicle.find({ user: req.user.id });
+    }
 
     // Fetch external device data
     let externalDevices = [];
