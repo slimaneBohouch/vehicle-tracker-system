@@ -39,6 +39,10 @@ exports.login = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Invalid credentials', 401));
   }
 
+  if (user.status === 'inactive') {
+    return next(new ErrorResponse('Your account has been deactivated.', 403));
+  }
+
   // Check if password matches
   const isMatch = await user.matchPassword(password);
 
@@ -51,6 +55,7 @@ exports.login = asyncHandler(async (req, res, next) => {
 
   sendTokenResponse(user, 200, res);
 });
+
 
 
 // @desc    Log user out / clear cookie
