@@ -12,6 +12,7 @@ const hpp = require('hpp');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
+const jwt = require('jsonwebtoken');
 
 const errorHandler = require('./middleware/error');
 const connectDB = require('./config/db');
@@ -19,56 +20,32 @@ const auth = require('./routes/auth');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const geofenceRoutes = require('./routes/geofenceRoutes');
 const geofenceService = require('./services/geofenceService');
+const User = require('./models/User');
+const userRoutes = require('./routes/userRoutes')
 
-// Load env vars
+
+
 dotenv.config();
-
-// Connect to database
 connectDB();
 
 const app = express();
 
-// Body parser
 app.use(express.json());
-
-// Cookie parser
 app.use(cookieParser());
 
-// Dev logging middleware
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Sanitize data
 app.use(mongoSanitize());
-
-// Set security headers
 app.use(helmet());
-
-// Prevent XSS attacks
 app.use(xss());
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 100
-});
-app.use(limiter);
-
-// Prevent HTTP param pollution
+app.use(rateLimit({ windowMs: 10 * 60 * 1000, max: 100 }));
 app.use(hpp());
-
-// Enable CORS
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true
-}));
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.options('*', cors());
 
-// Set static folder
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Serve uploaded files with CORS headers
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
   setHeaders: (res, path) => {
     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
@@ -76,15 +53,41 @@ app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
   }
 }));
 
-// Mount API routes
+// Middleware to attach user from JWT cookie
+app.use(async (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) return next();
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = await User.findById(decoded.id);
+  } catch (err) {
+    console.error('JWT error:', err);
+  }
+  next();
+});
+
+// Update lastActive if logged in
+app.use(async (req, res, next) => {
+  if (req.user) {
+    const now = new Date();
+    const diffMs = now - new Date(req.user.lastActive || 0);
+    const threshold = 1000 * 60 * 5;
+    if (diffMs > threshold) {
+      await User.findByIdAndUpdate(req.user._id, { lastActive: now });
+    }
+  }
+  next();
+});
+
+// API Routes
 app.use('/api/v1/auth', auth);
 app.use('/api/v1/vehicles', vehicleRoutes);
 app.use('/api/v1/geofences', geofenceRoutes);
+app.use('/api/v1/users', userRoutes);
 
-// Error handler middleware
 app.use(errorHandler);
 
-// Create HTTP server for Express + Socket.IO
 const PORT = process.env.PORT || 5000;
 const httpServer = http.createServer(app);
 const io = socketIo(httpServer, {
@@ -94,7 +97,6 @@ const io = socketIo(httpServer, {
   }
 });
 
-// WebSocket logic
 io.on('connection', (socket) => {
   console.log('Client connected');
 
@@ -119,8 +121,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start the server
 httpServer.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}.`.blue.bold);
-  console.log(`Server is now listening for connections...`);
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.blue.bold);
 });

@@ -6,7 +6,7 @@ const {
   updateGeofence,
   deleteGeofence,
   assignVehiclesToGeofence,
-  checkVehicleGeofences
+  checkAllVehicleGeofences
 } = require('../controllers/geofenceController');
 
 // Middleware
@@ -22,6 +22,10 @@ router.route('/')
   .get(getGeofences)
   .post(createGeofence);
 
+// Check if a vehicle is inside any geofences
+router.route('/check-all')
+  .get(checkAllVehicleGeofences);
+
 router.route('/:id')
   .get(getGeofence)
   .put(updateGeofence)
@@ -31,8 +35,6 @@ router.route('/:id')
 router.route('/:id/vehicles')
   .put(assignVehiclesToGeofence);
 
-// Check if a vehicle is inside any geofences
-router.route('/check/:vehicleId')
-  .get(checkVehicleGeofences);
+
 
 module.exports = router;
