@@ -4,7 +4,9 @@ const {
   getAllUsers,
   updateUserStatus,
   updateUserRole,
-  getUserById
+  getUserById,
+  getUserVehicleStats
+
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -17,5 +19,6 @@ router.patch('/:id/status', protect, authorize('admin', 'superadmin'), updateUse
 // Update role (only superadmin)
 router.patch('/:id/role', protect, authorize('superadmin'), updateUserRole);
 router.get('/:id', protect, authorize('admin', 'superadmin'), getUserById);
+router.get('/:id/stats', protect, authorize('admin', 'superadmin'), getUserVehicleStats);
 
 module.exports = router;

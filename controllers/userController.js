@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Vehicle = require('../models/Vehicle');
 const ErrorResponse = require('../Utils/errorResponse');
 
 exports.getAllUsers = async (req, res, next) => {
@@ -88,6 +89,28 @@ exports.getUserById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
     res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getUserVehicleStats = async (req, res, next) => {
+  try {
+    const userId = req.params.id;
+
+    // Count total vehicles owned by the user
+    const totalVehicles = await Vehicle.countDocuments({ user: userId });
+
+    // Count vehicles with currentStatus = 'moving'
+    const movingVehicles = await Vehicle.countDocuments({ user: userId, currentStatus: 'moving' });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalVehicles,
+        movingVehicles
+      }
+    });
   } catch (error) {
     next(error);
   }
