@@ -1,4 +1,4 @@
-  const Geofence = require('../models/Geofence');
+const Geofence = require('../models/Geofence');
   const Vehicle = require('../models/Vehicle');
   const geoUtils = require('../utils/geoUtils');
   const asyncHandler = require('../middleware/async');
@@ -47,7 +47,16 @@
    * @access  Private
    */
   exports.getGeofences = asyncHandler(async (req, res, next) => {
-    const geofences = await Geofence.find({ user: req.user.id });
+    let geofences;
+
+    // Check if the user is an admin or superadmin
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+      // Admins and superadmins can see all geofences
+      geofences = await Geofence.find().populate('user', 'name');
+    } else {
+      // Regular users can only see their own geofences
+      geofences = await Geofence.find({ user: req.user.id });
+    }
 
     res.status(200).json({
       success: true,
@@ -97,11 +106,14 @@
       );
     }
 
-    // Make sure user owns the geofence
-    if (geofence.user.toString() !== req.user.id) {
-      return next(
-        new ErrorResponse(`User not authorized to update this geofence`, 401)
-      );
+    // Allow admin and superadmin to modify any geofence
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+      // Make sure user owns the geofence
+      if (geofence.user.toString() !== req.user.id) {
+        return next(
+          new ErrorResponse(`User not authorized to update this geofence`, 401)
+        );
+      }
     }
 
     // Validate geofence data if type is being updated
@@ -228,10 +240,16 @@
  * @access  Private
  */
 exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
-  // 1) Load user's vehicles
-  const vehicles = await Vehicle.find({ user: req.user.id });
+  let vehicles;
 
-  // 2) Fetch external device data
+  // Allow admin and superadmin to check all vehicles
+  if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+    vehicles = await Vehicle.find();
+  } else {
+    vehicles = await Vehicle.find({ user: req.user.id });
+  }
+
+  // Fetch external device data
   let externalDevices = [];
   try {
     const externalResponse = await axios.get('http://www.pogog.ovh:5051/devices');
@@ -241,7 +259,7 @@ exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
     // Proceed with internal data only
   }
 
-  // 3) Enrich each vehicle with lat/lon from API or DB
+  // Enrich each vehicle with lat/lon from API or DB
   const enriched = vehicles.map(v => {
     const dev = externalDevices.find(d =>
       d.IMEI?.toString().trim().toUpperCase() === v.imei?.toString().trim().toUpperCase()
@@ -261,10 +279,10 @@ exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
     };
   });
 
-  // 4) Load active geofences
-  const geofences = await Geofence.find({ user: req.user.id, active: true });
+  // Load active geofences
+  const geofences = await Geofence.find({ active: true });
 
-  // 5) For each vehicle, check which of its assigned zones it's inside
+  // For each vehicle, check which of its assigned zones it's inside
   const results = enriched.map(({ vehicleId, vehicleName, lat, lon }) => {
     const vehicle = vehicles.find(v => v._id.toString() === vehicleId);
 
@@ -279,8 +297,7 @@ exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
     if (lat != null && lon != null) {
       assignedGeofences.forEach(g => {
         const dist = geoUtils.getDistance(lat, lon, g.center.lat, g.center.lon);
-    
-      
+
         if (dist <= g.radius) {
           inside.push({
             id: g._id.toString(),
@@ -289,7 +306,6 @@ exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
           });
         }
       });
-      
     }
 
     return { vehicleId, vehicleName, inside };
