@@ -1,4 +1,4 @@
-  const Geofence = require('../models/Geofence');
+const Geofence = require('../models/Geofence');
   const Vehicle = require('../models/Vehicle');
   const geoUtils = require('../utils/geoUtils');
   const asyncHandler = require('../middleware/async');
@@ -47,7 +47,16 @@
    * @access  Private
    */
   exports.getGeofences = asyncHandler(async (req, res, next) => {
-    const geofences = await Geofence.find({ user: req.user.id });
+    let geofences;
+
+    // Check if the user is an admin or superadmin
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+      // Admins and superadmins can see all geofences
+      geofences = await Geofence.find().populate('user', 'name');
+    } else {
+      // Regular users can only see their own geofences
+      geofences = await Geofence.find({ user: req.user.id });
+    }
 
     res.status(200).json({
       success: true,
