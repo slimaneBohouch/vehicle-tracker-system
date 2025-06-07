@@ -4,7 +4,16 @@ const mongoose = require('mongoose');
 // GET /api/alert-rules
 exports.getAlertRules = async (req, res) => {
   try {
-    const rules = await AlertRule.find({ createdBy: req.user._id });
+    let rules;
+
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+      // Admins and superadmins can see all alert rules
+      rules = await AlertRule.find();
+    } else {
+      // Regular users can only see their own alert rules
+      rules = await AlertRule.find({ createdBy: req.user._id });
+    }
+
     res.json(rules);
   } catch (err) {
     console.error(err);
@@ -15,7 +24,16 @@ exports.getAlertRules = async (req, res) => {
 // GET /api/alert-rules/:id
 exports.getAlertRule = async (req, res) => {
   try {
-    const rule = await AlertRule.findOne({ _id: req.params.id, createdBy: req.user._id }).populate('vehicles');
+    let rule;
+
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+      // Admins and superadmins can access any alert rule
+      rule = await AlertRule.findById(req.params.id);
+    } else {
+      // Regular users can only access their own alert rules
+      rule = await AlertRule.findOne({ _id: req.params.id, createdBy: req.user._id });
+    }
+
     if (!rule) return res.status(404).json({ error: 'Alert rule not found' });
     res.json(rule);
   } catch (err) {
