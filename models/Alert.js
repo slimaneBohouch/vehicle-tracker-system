@@ -12,7 +12,7 @@ const AlertSchema = new mongoose.Schema({
     enum: [
       'SPEED_ALERT', 
       'BATTERY_ALERT', 
-      'GEOFENCE_EXIT', 
+      'GEOFENCE_EXIT',
       'GEOFENCE_ENTRY', 
       'TIME_RESTRICTION', 
       'MOVEMENT_ALERT', 
