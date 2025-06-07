@@ -22,6 +22,7 @@ const geofenceRoutes = require('./routes/geofenceRoutes');
 const geofenceService = require('./services/geofenceService');
 const User = require('./models/User');
 const userRoutes = require('./routes/userRoutes')
+const alertRuleRoutes = require('./routes/alertRuleRoutes');
 
 
 
@@ -85,6 +86,7 @@ app.use('/api/v1/auth', auth);
 app.use('/api/v1/vehicles', vehicleRoutes);
 app.use('/api/v1/geofences', geofenceRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/alert-rules', alertRuleRoutes);
 
 app.use(errorHandler);
 
