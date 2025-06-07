@@ -4,11 +4,11 @@ const mongoose = require('mongoose');
 // GET /api/alert-rules
 exports.getAlertRules = async (req, res) => {
   try {
-    const rules = await AlertRule.find({ createdBy: req.user._id }).populate('vehicles');
+    const rules = await AlertRule.find({ createdBy: req.user._id });
     res.json(rules);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch alert rules' });
+    res.status(500).json({ error: err.message || 'Failed to fetch alert rules' });
   }
 };
 
@@ -19,7 +19,7 @@ exports.getAlertRule = async (req, res) => {
     if (!rule) return res.status(404).json({ error: 'Alert rule not found' });
     res.json(rule);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get alert rule' });
+    res.status(500).json({ error: err.message || 'Failed to get alert rule' });
   }
 };
 
@@ -55,7 +55,7 @@ exports.updateAlertRule = async (req, res) => {
     if (!rule) return res.status(404).json({ error: 'Alert rule not found' });
     res.json(rule);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to update alert rule' });
+    res.status(500).json({ error: err.message || 'Failed to update alert rule' });
   }
 };
 
@@ -66,7 +66,7 @@ exports.deleteAlertRule = async (req, res) => {
     if (result.deletedCount === 0) return res.status(404).json({ error: 'Alert rule not found' });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete alert rule' });
+    res.status(500).json({ error: err.message || 'Failed to delete alert rule' });
   }
 };
 
@@ -81,6 +81,6 @@ exports.toggleAlertRule = async (req, res) => {
 
     res.json(rule);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to toggle alert rule' });
+    res.status(500).json({ error: err.message || 'Failed to toggle alert rule' });
   }
 };
