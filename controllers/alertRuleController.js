@@ -80,7 +80,12 @@ exports.updateAlertRule = async (req, res) => {
 // DELETE /api/alert-rules/:id
 exports.deleteAlertRule = async (req, res) => {
   try {
-    const result = await AlertRule.deleteOne({ _id: req.params.id, createdBy: req.user._id });
+    let result;
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+      result = await AlertRule.deleteOne({ _id: req.params.id });
+    } else {
+      result = await AlertRule.deleteOne({ _id: req.params.id, createdBy: req.user._id });
+    }
     if (result.deletedCount === 0) return res.status(404).json({ error: 'Alert rule not found' });
     res.json({ success: true });
   } catch (err) {
