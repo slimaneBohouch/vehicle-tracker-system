@@ -23,6 +23,7 @@ const alertRuleRoutes = require('./routes/alertRuleRoutes');
 const geofenceService = require('./services/geofenceService');
 const User = require('./models/User');
 const socket = require('./Utils/socket');
+const immobilizationRoutes = require('./routes/immobilizationRoutes');
 
 dotenv.config();
 connectDB();
@@ -78,6 +79,7 @@ app.use('/api/v1/vehicles', vehicleRoutes);
 app.use('/api/v1/geofences', geofenceRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/alert-rules', alertRuleRoutes);
+app.use('/api/v1/immobilizations', immobilizationRoutes);
 
 app.use(errorHandler);
 

@@ -1,5 +1,5 @@
 // controllers/immobilizationController.js
-const Immobilization = require('../models/immobilizationModel');
+const Immobilization = require('../models/Immobilization');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/AppError');
 
