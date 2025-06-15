@@ -71,29 +71,6 @@ const vehicleSchema = new mongoose.Schema({
     y: Number,
     z: Number
   },
-  immobilizationHistory: [
-    {
-      status: {
-        type: Boolean,
-        required: true
-      },
-      timestamp: {
-        type: Date,
-        default: Date.now
-      },
-      reason: String,
-      triggeredBy: {
-        type: mongoose.Schema.ObjectId,
-        ref: 'User'
-      }
-    }
-  ],
-  assignedGeofences: [
-    {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Geofence'
-    }
-  ],
   createdAt: {
     type: Date,
     default: Date.now
