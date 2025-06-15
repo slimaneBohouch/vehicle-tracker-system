@@ -33,6 +33,15 @@ const vehicleSchema = new mongoose.Schema({
     enum: ['moving', 'stopped', 'immobilized', 'inactive'],
     default: 'inactive'
   },
+  lastPosition: {
+    lat: Number,
+    lon: Number,
+    speed: Number,
+    timestamp: Date,
+    satellites: Number,
+    ignition: Boolean,
+    movement: Boolean
+  },
   lastLocation: {
     type: {
       type: String,
@@ -51,6 +60,16 @@ const vehicleSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
+  },
+  extendedData: {
+    vehicleBattery: Number,
+    DIN1: Number,
+    externalVoltageExtanded: Number,
+    totalOdometer: Number,
+    tripOdometer: Number,
+    x: Number,
+    y: Number,
+    z: Number
   },
   immobilizationHistory: [
     {

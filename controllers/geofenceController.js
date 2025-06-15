@@ -331,12 +331,8 @@ exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
     const geofence = await Geofence.findOne({ vehicles: new mongoose.Types.ObjectId(vehicleId) });
 
 
-    if (!geofence) {
-      return next(new ErrorResponse(`No geofence found for vehicle ID ${vehicleId}`, 404));
-    }
-
     res.status(200).json({
       success: true,
-      data: geofence,
+      data: geofence || null, 
     });
   });

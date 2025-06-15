@@ -4,6 +4,8 @@ const Vehicle = require('../models/Vehicle');
   const AppError = require('../utils/AppError');
   const axios = require('axios');
   const moment = require('moment');
+  const socket = require('../Utils/socket');
+const geofenceService = require('../services/geofenceService');
 
   // Configuration for external IMEI validation API
   const DEVICES_API_URL = process.env.DEVICES_API_URL || 'http://www.pogog.ovh:5051/devices';
@@ -361,3 +363,55 @@ const Vehicle = require('../models/Vehicle');
       },
     });
   });
+
+  exports.handleLiveVehicleData = async (data) => {
+  try {
+    const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp } = data;
+
+    if (!IMEI || !lat || !lon) {
+      console.warn('Invalid data received:', data);
+      return;
+    }
+
+    const vehicle = await Vehicle.findOne({ imei: IMEI });
+
+    if (!vehicle) {
+      console.warn(`Vehicle not found for IMEI ${IMEI}`);
+      return;
+    }
+
+    // Set currentStatus based on ignition and speed
+    if (ignition) {
+      vehicle.currentStatus = (speedGps && speedGps > 0) ? 'moving' : 'stopped';
+    } else {
+      vehicle.currentStatus = 'inactive';
+    }
+    vehicle.lastPosition = {
+      lat,
+      lon,
+      speed: speedGps || 0,
+      timestamp: gpsTimestamp || new Date(),
+    };
+    await vehicle.save();
+
+    const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
+
+    socket.getIO().emit('vehicle_data', {
+      vehicleId: vehicle._id,
+      imei: IMEI,
+      lat,
+      lon,
+      speed: speedGps,
+      ignition,
+      timestamp: gpsTimestamp,
+      insideGeofences: insideGeofences.map(g => ({
+        id: g._id,
+        name: g.name,
+        type: g.type
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error in handleLiveVehicleData:', error.message);
+  }
+};
