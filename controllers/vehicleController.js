@@ -349,6 +349,10 @@ const geofenceService = require('../services/geofenceService');
       });
     }
 
+    const activeVehicles = await Vehicle.countDocuments({ currentStatus: { $in: ['moving', 'stopped'] } });
+    const movingVehicles = await Vehicle.countDocuments({ currentStatus: 'moving' });
+    const idleVehicles = await Vehicle.countDocuments({ currentStatus: 'inactive' });
+
     // Calculate difference and signed value
     const rawDiff = currentMonthCount - lastMonthCount;
     const difference = `${rawDiff >= 0 ? '+' : '-'}${Math.abs(rawDiff)}`;
@@ -360,6 +364,9 @@ const geofenceService = require('../services/geofenceService');
         lastMonthCount,
         currentMonthCount,
         difference,
+        activeVehicles,
+        movingVehicles,
+        idleVehicles,
       },
     });
   });
