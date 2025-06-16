@@ -25,6 +25,36 @@ exports.createImmobilization = catchAsync(async (req, res, next) => {
 
 // Obtenir toutes les immobilisations
 exports.getAllImmobilizations = catchAsync(async (req, res, next) => {
+    const status = req.query.status;
+    if(status === 'active') {
+      // Filtrer pour les immobilisations actives
+      const records = await Immobilization.find({ status: 'active' })
+        .populate('vehicle', 'name licensePlate')
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 });
+
+      return res.status(200).json({
+        status: 'success',
+        results: records.length,
+        data: {
+          immobilizations: records,
+        },
+      });
+    }else if(status === 'inactive') {
+      // Filtrer pour les immobilisations inactives
+      const records = await Immobilization.find({ status: 'inactive' })
+        .populate('vehicle', 'name licensePlate')
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 });
+
+      return res.status(200).json({
+        status: 'success',
+        results: records.length,
+        data: {
+          immobilizations: records,
+        },
+      });
+    }
   const records = await Immobilization.find()
     .populate('vehicle', 'name licensePlate')
     .populate('user', 'name email')
