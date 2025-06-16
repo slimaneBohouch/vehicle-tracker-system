@@ -2,6 +2,7 @@
 const Immobilization = require('../models/Immobilization');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/AppError');
+const Vehicle = require('../models/Vehicle');
 
 // Créer une nouvelle immobilisation
 exports.createImmobilization = catchAsync(async (req, res, next) => {
@@ -12,7 +13,12 @@ exports.createImmobilization = catchAsync(async (req, res, next) => {
     reason: req.body.reason,
     location: req.body.location,
   };
-
+  const vehicle = await Vehicle.findById(req.body.vehicle);
+  if (!vehicle) {
+    return next(new AppError('Vehicle not found', 404));
+  }
+  vehicle.currentStatus = 'immobilized';
+  await vehicle.save();
   const record = await Immobilization.create(data);
 
   res.status(201).json({
