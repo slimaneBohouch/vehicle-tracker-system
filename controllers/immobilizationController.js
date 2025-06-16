@@ -83,14 +83,13 @@ exports.getImmobilization = catchAsync(async (req, res, next) => {
   });
 });
 
-// Modifier une immobilisation
-exports.updateImmobilization = catchAsync(async (req, res, next) => {
-  const record = await Immobilization.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-  });
+exports.mobilizeImmobilization = catchAsync(async (req, res, next) => {
+  const record = await Immobilization.findById(req.params.id);
 
   if (!record) return next(new AppError('Immobilization not found', 404));
+
+  record.status = 'inactive';
+  await record.save();
 
   res.status(200).json({
     status: 'success',

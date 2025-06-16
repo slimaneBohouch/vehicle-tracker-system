@@ -14,7 +14,10 @@ router
 router
   .route('/:id')
   .get(immobilizationController.getImmobilization)
-  .patch(immobilizationController.updateImmobilization)
   .delete(immobilizationController.deleteImmobilization);
+
+router
+   .route('/:id/mobilize')
+   .post(immobilizationController.mobilizeImmobilization);
 
 module.exports = router;
