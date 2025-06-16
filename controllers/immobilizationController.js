@@ -6,17 +6,28 @@ const Vehicle = require('../models/Vehicle');
 
 // Créer une nouvelle immobilisation
 exports.createImmobilization = catchAsync(async (req, res, next) => {
+  const vehicleId = req.body.vehicle;
+
+  // Check if there is already an active immobilization for this vehicle
+  const existing = await Immobilization.findOne({ vehicle: vehicleId, status: 'active' });
+  if (existing) {
+    return next(new AppError('Vehicle already immobilized', 400));
+  }
+
+  const vehicle = await Vehicle.findById(vehicleId);
+  if (!vehicle) {
+    return next(new AppError('Vehicle not found', 404));
+  }
+
   const data = {
-    vehicle: req.body.vehicle,
+    vehicle: vehicleId,
     user: req.user.id,
     action: req.body.action,
     reason: req.body.reason,
     location: req.body.location,
+    status: 'active'
   };
-  const vehicle = await Vehicle.findById(req.body.vehicle);
-  if (!vehicle) {
-    return next(new AppError('Vehicle not found', 404));
-  }
+
   vehicle.currentStatus = 'immobilized';
   await vehicle.save();
   const record = await Immobilization.create(data);
