@@ -270,61 +270,45 @@ const geofenceService = require('../services/geofenceService');
    * GET /api/vehicles/stats
    */
   exports.getVehicleStats = catchAsync(async (req, res, next) => {
-    let total, lastMonthCount, currentMonthCount;
+    let total, lastMonthCount, currentMonthCount, activeVehicles, movingVehicles, idleVehicles;
+    const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
 
-    // Check if the user is an admin
-    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
-      // Admins can see stats for all vehicles
-      total = await Vehicle.countDocuments();
+    // Date ranges
+    const lastMonthStart = moment().subtract(1, 'month').startOf('month').toDate();
+    const lastMonthEnd = moment().subtract(1, 'month').endOf('month').toDate();
+    const currentMonthStart = moment().startOf('month').toDate();
+    const now = moment().toDate();
 
-      // Define last month date range
-      const lastMonthStart = moment().subtract(1, 'month').startOf('month').toDate();
-      const lastMonthEnd = moment().subtract(1, 'month').endOf('month').toDate();
+    const baseQuery = isAdmin ? {} : { user: userId };
 
-      // Define current month range
-      const currentMonthStart = moment().startOf('month').toDate();
-      const now = moment().toDate();
+    total = await Vehicle.countDocuments(baseQuery);
 
-      // Count vehicles created in last month
-      lastMonthCount = await Vehicle.countDocuments({
-        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
-      });
+    lastMonthCount = await Vehicle.countDocuments({
+      ...baseQuery,
+      createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
+    });
 
-      // Count vehicles created in current month
-      currentMonthCount = await Vehicle.countDocuments({
-        createdAt: { $gte: currentMonthStart, $lte: now },
-      });
-    } else {
-      // Regular users can only see stats for their own vehicles
-      const userId = req.user.id;
-      total = await Vehicle.countDocuments({ user: userId });
+    currentMonthCount = await Vehicle.countDocuments({
+      ...baseQuery,
+      createdAt: { $gte: currentMonthStart, $lte: now },
+    });
 
-      // Define last month date range
-      const lastMonthStart = moment().subtract(1, 'month').startOf('month').toDate();
-      const lastMonthEnd = moment().subtract(1, 'month').endOf('month').toDate();
+    activeVehicles = await Vehicle.countDocuments({
+      ...baseQuery,
+      currentStatus: { $in: ['moving', 'stopped'] }
+    });
 
-      // Define current month range
-      const currentMonthStart = moment().startOf('month').toDate();
-      const now = moment().toDate();
+    movingVehicles = await Vehicle.countDocuments({
+      ...baseQuery,
+      currentStatus: 'moving'
+    });
 
-      // Count vehicles created in last month
-      lastMonthCount = await Vehicle.countDocuments({
-        user: userId,
-        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
-      });
+    idleVehicles = await Vehicle.countDocuments({
+      ...baseQuery,
+      currentStatus: 'inactive'
+    });
 
-      // Count vehicles created in current month
-      currentMonthCount = await Vehicle.countDocuments({
-        user: userId,
-        createdAt: { $gte: currentMonthStart, $lte: now },
-      });
-    }
-
-    const activeVehicles = await Vehicle.countDocuments({ currentStatus: { $in: ['moving', 'stopped'] } });
-    const movingVehicles = await Vehicle.countDocuments({ currentStatus: 'moving' });
-    const idleVehicles = await Vehicle.countDocuments({ currentStatus: 'inactive' });
-
-    // Calculate difference and signed value
     const rawDiff = currentMonthCount - lastMonthCount;
     const difference = `${rawDiff >= 0 ? '+' : '-'}${Math.abs(rawDiff)}`;
 
