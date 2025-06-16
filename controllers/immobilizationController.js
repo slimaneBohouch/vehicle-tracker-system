@@ -96,6 +96,11 @@ exports.mobilizeImmobilization = catchAsync(async (req, res, next) => {
 
   record.status = 'inactive';
   await record.save();
+  const vehicle = await Vehicle.findById(record.vehicle);
+  if (vehicle) {
+    vehicle.currentStatus = 'inactive';
+    await vehicle.save();
+  }
 
   res.status(200).json({
     status: 'success',
