@@ -358,11 +358,12 @@ const geofenceService = require('../services/geofenceService');
       return;
     }
 
-    // Set currentStatus based on ignition and speed
-    if (ignition) {
+    if (vehicle.currentStatus !== 'immobilized') {
+      if (ignition) {
       vehicle.currentStatus = (speedGps && speedGps > 0) ? 'moving' : 'stopped';
-    } else {
+      } else {
       vehicle.currentStatus = 'inactive';
+      }
     }
     vehicle.lastPosition = {
       lat,
