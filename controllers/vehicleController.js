@@ -326,7 +326,7 @@ const geofenceService = require('../services/geofenceService');
     });
   });
 
-  exports.handleLiveVehicleData = async (data) => {
+exports.handleLiveVehicleData = async (data) => {
   try {
     const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
 
@@ -343,24 +343,25 @@ const geofenceService = require('../services/geofenceService');
     }
 
     if (vehicle.currentStatus !== 'immobilized') {
-      if (ignition) {
-      vehicle.currentStatus = (speedGps && speedGps > 0) ? 'moving' : 'stopped';
-      } else {
-      vehicle.currentStatus = 'inactive';
-      }
+      vehicle.currentStatus = ignition
+        ? (speedGps && speedGps > 0 ? 'moving' : 'stopped')
+        : 'inactive';
     }
+
     vehicle.lastPosition = {
       lat,
       lon,
       speed: speedGps || 0,
       timestamp: gpsTimestamp || new Date(),
+      ignition,
     };
+
     vehicle.extendedData = extendedData;
     await vehicle.save();
 
     const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
 
-    socket.getIO().emit('vehicle_data', {
+    const payload = {
       vehicleId: vehicle._id,
       imei: IMEI,
       lat,
@@ -374,9 +375,17 @@ const geofenceService = require('../services/geofenceService');
         name: g.name,
         type: g.type
       }))
-    });
+    };
+
+    const io = socket.getIO();
+
+    // ✅ Send only to the vehicle's owner
+    io.to(vehicle.user.toString()).emit('vehicle_data', payload);
+
+    // ✅ Send to admin/superadmin users
+    io.to('admins').emit('vehicle_data', payload);
 
   } catch (error) {
-    console.error('Error in handleLiveVehicleData:', error.message);
+    console.error('[TCP] Error in handleLiveVehicleData:', error.message);
   }
 };

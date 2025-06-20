@@ -90,26 +90,6 @@ const io = socket.init(httpServer);
 const { setupTCPListener } = require('./services/tcpReceiver');
 setupTCPListener();
 
-io.on('connection', (socket) => {
-  console.log('Client connected');
-
-  socket.on('position_update', async (data) => {
-    if (data.vehicleId && data.lat && data.lon) {
-      const position = { lat: data.lat, lon: data.lon };
-      const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(data.vehicleId, position);
-
-      socket.emit('geofence_status', {
-        vehicleId: data.vehicleId,
-        insideGeofences: insideGeofences.map(g => ({ id: g._id, name: g.name, type: g.type }))
-      });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
-});
-
 httpServer.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.blue.bold);
 });

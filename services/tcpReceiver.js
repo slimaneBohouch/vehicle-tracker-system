@@ -25,7 +25,7 @@ const setupTCPListener = () => {
 
       try {
         const parsedData = JSON.parse(chunk);
-        vehicleController.handleLiveVehicleData(parsedData);
+        vehicleController.handleLiveVehicleData(parsedData); // ✅ Calls controller that will emit via rooms
       } catch (err) {
         console.error('[TCP] JSON error:', err.message);
         console.error('Chunk:', chunk);
