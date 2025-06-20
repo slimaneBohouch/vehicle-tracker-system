@@ -342,9 +342,28 @@ exports.handleLiveVehicleData = async (data) => {
       return;
     }
 
+    // 🔁 Get ignition from main data or fallback to extendedData.DIN1
+    let rawIgnition = ignition;
+
+    if (rawIgnition === undefined && extendedData?.DIN1 !== undefined) {
+      rawIgnition = extendedData.DIN1;
+    }
+
+    // ✅ Normalize ignition to boolean (true/false)
+    const isIgnitionOn =
+      rawIgnition === 1 ||
+      rawIgnition === '1' ||
+      rawIgnition === true ||
+      rawIgnition === 'true';
+
+    const isMoving = isIgnitionOn && speedGps > 0;
+
+    // ❌ Don't change status if immobilized
     if (vehicle.currentStatus !== 'immobilized') {
-      vehicle.currentStatus = ignition
-        ? (speedGps && speedGps > 0 ? 'moving' : 'stopped')
+      vehicle.currentStatus = isMoving
+        ? 'moving'
+        : isIgnitionOn
+        ? 'stopped'
         : 'inactive';
     }
 
@@ -353,7 +372,7 @@ exports.handleLiveVehicleData = async (data) => {
       lon,
       speed: speedGps || 0,
       timestamp: gpsTimestamp || new Date(),
-      ignition,
+      ignition: isIgnitionOn,
     };
 
     vehicle.extendedData = extendedData;
@@ -367,24 +386,20 @@ exports.handleLiveVehicleData = async (data) => {
       lat,
       lon,
       speed: speedGps,
-      ignition,
+      ignition: isIgnitionOn,
       timestamp: gpsTimestamp,
       extendedData,
       insideGeofences: insideGeofences.map(g => ({
         id: g._id,
         name: g.name,
-        type: g.type
-      }))
+        type: g.type,
+      })),
     };
 
     const io = socket.getIO();
 
-    // ✅ Send only to the vehicle's owner
     io.to(vehicle.user.toString()).emit('vehicle_data', payload);
-
-    // ✅ Send to admin/superadmin users
     io.to('admins').emit('vehicle_data', payload);
-
   } catch (error) {
     console.error('[TCP] Error in handleLiveVehicleData:', error.message);
   }
