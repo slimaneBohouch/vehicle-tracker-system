@@ -43,13 +43,7 @@ const positionSchema = new mongoose.Schema({
     battery: {
       type: Number, // battery percentage
       min: 0,
-      max: 100
     },
-    signal: {
-      type: Number, // signal strength percentage
-      min: 0,
-      max: 100
-    }
   },
   trip: {
     type: mongoose.Schema.ObjectId,

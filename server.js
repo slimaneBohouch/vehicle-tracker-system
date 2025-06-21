@@ -12,7 +12,7 @@ const hpp = require('hpp');
 const cors = require('cors');
 const http = require('http');
 const jwt = require('jsonwebtoken');
-
+const cron = require("node-cron");
 const errorHandler = require('./middleware/error');
 const connectDB = require('./config/db');
 const auth = require('./routes/auth');
@@ -84,6 +84,16 @@ app.use('/api/v1/immobilizations', immobilizationRoutes);
 app.use('/api/v1/trips', tripRoutes);
 
 app.use(errorHandler);
+
+
+const closeInactiveTrips = require("./jobs/tripCleanup");
+
+// Run every 2 minutes
+cron.schedule("*/2 * * * *", async () => {
+  console.log("🔁 Running cron job to close inactive trips...");
+  await closeInactiveTrips();
+});
+
 
 const PORT = process.env.PORT || 5000;
 const httpServer = http.createServer(app);

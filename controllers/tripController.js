@@ -1,15 +1,14 @@
 const Trip = require('../models/Trip');
 const Position = require('../models/Position');
 
-const POSITION_INTERVAL = 30 * 1000; // 30 seconds
+const POSITION_INTERVAL = 30 * 1000; // 30 sec
 
-// 🔁 Haversine formula to calculate distance in km
 function haversineDistance(coord1, coord2) {
   const R = 6371; // Earth radius in km
   const toRad = deg => deg * Math.PI / 180;
 
-  const dLat = toRad(coord2[1] - coord1[1]); // lat2 - lat1
-  const dLon = toRad(coord2[0] - coord1[0]); // lon2 - lon1
+  const dLat = toRad(coord2[1] - coord1[1]);
+  const dLon = toRad(coord2[0] - coord1[0]);
   const lat1 = toRad(coord1[1]);
   const lat2 = toRad(coord2[1]);
 
@@ -22,50 +21,46 @@ function haversineDistance(coord1, coord2) {
 exports.handleTripTracking = async (vehicle, data) => {
   const { lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
   const timestamp = gpsTimestamp ? new Date(gpsTimestamp) : new Date();
-  const isMoving = ignition && speedGps >= 0;
+
+  const isIgnitionOn = ignition === true || extendedData?.DIN1 === 1;
+  const isIgnitionOff = ignition === false || extendedData?.DIN1 === 0;
+  const isMoving = isIgnitionOn && speedGps > 0;
 
   let trip = await Trip.findOne({ vehicle: vehicle._id, status: 'active' });
 
-  // 🛑 If vehicle stopped, end the trip
-  if (!isMoving) {
-    if (trip) {
-      const lastPosition = await Position.findOne({ trip: trip._id }).sort({ createdAt: -1 });
+  // 🛑 End the trip if ignition is off
+  if (isIgnitionOff && trip) {
+    const lastPosition = await Position.findOne({ trip: trip._id }).sort({ createdAt: -1 });
 
-      // Add final distance if possible
-      if (lastPosition) {
-        const lastCoord = lastPosition.location.coordinates;
-        const currentCoord = [lon, lat];
-        const distance = haversineDistance(currentCoord, lastCoord);
-        trip.summary.distance += distance;
-      }
-
-      trip.status = 'completed';
-      trip.endTime = timestamp;
-      trip.endLocation = {
-        type: 'Point',
-        coordinates: [lon, lat],
-        timestamp,
-        speed: speedGps
-      };
-
-      const durationMs = trip.endTime - trip.startTime;
-      const durationMin = durationMs / 60000; // in minutes
-      trip.summary.duration = durationMin;
-
-      // ✅ averageSpeed = total distance / duration in hours
-      trip.summary.averageSpeed =
-        durationMin > 0 ? (trip.summary.distance / (durationMin / 60)) : 0;
-
-      await trip.save();
-
-      // Debug log
-      console.log(`[Trip Ended] Distance: ${trip.summary.distance.toFixed(2)} km | Duration: ${durationMin.toFixed(2)} min | AvgSpeed: ${trip.summary.averageSpeed.toFixed(2)} km/h`);
+    if (lastPosition) {
+      const lastCoord = lastPosition.location.coordinates;
+      const currentCoord = [lon, lat];
+      const distance = haversineDistance(currentCoord, lastCoord);
+      trip.summary.distance += distance;
     }
+
+    trip.status = 'completed';
+    trip.endTime = timestamp;
+    trip.endLocation = {
+      type: 'Point',
+      coordinates: [lon, lat],
+      timestamp,
+      speed: speedGps
+    };
+
+    const durationMs = trip.endTime - trip.startTime;
+    const durationMin = durationMs / 60000;
+    trip.summary.duration = durationMin;
+    trip.summary.averageSpeed = durationMin > 0 ? (trip.summary.distance / (durationMin / 60)) : 0;
+
+    await trip.save();
+
+    console.log(`[Trip Ended] ${vehicle.name} | Distance: ${trip.summary.distance.toFixed(2)} km | Duration: ${durationMin.toFixed(1)} min`);
     return;
   }
 
-  // 🆕 If no active trip, create one
-  if (!trip) {
+  // 🆕 Start a new trip if ignition on + moving
+  if (!trip && isMoving) {
     trip = await Trip.create({
       vehicle: vehicle._id,
       user: vehicle.user,
@@ -85,13 +80,16 @@ exports.handleTripTracking = async (vehicle, data) => {
       },
       status: 'active'
     });
+    console.log(`[Trip Started] ${vehicle.name} at ${timestamp.toISOString()}`);
   }
 
-  // ⏱ Prevent duplicate saves too close in time
+  // ⏱ Avoid saving too frequently
+  if (trip) {
   const lastPosition = await Position.findOne({ trip: trip._id }).sort({ createdAt: -1 });
+
   if (lastPosition && timestamp - lastPosition.createdAt < POSITION_INTERVAL) return;
 
-  // 📍 Create new position
+  // ✅ Enregistrer la nouvelle position
   await Position.create({
     vehicle: vehicle._id,
     trip: trip._id,
@@ -102,20 +100,22 @@ exports.handleTripTracking = async (vehicle, data) => {
     speed: speedGps,
     deviceStatus: {
       ignition,
-      battery: extendedData?.vehicleBattery || null
+      battery: extendedData?.vehicleBattery || 0
     },
     createdAt: timestamp
   });
 
-  // 📈 Update trip summary
+  // ✅ Mettre à jour le résumé du trip
   trip.summary.positionsCount += 1;
 
-  if (speedGps > trip.summary.maxSpeed) {
-    trip.summary.maxSpeed = speedGps;
+  // ✅ Calcul correct de la vitesse max
+  const currentValidSpeed = speedGps && speedGps > 0 ? speedGps : 0;
+  if (currentValidSpeed > trip.summary.maxSpeed) {
+    trip.summary.maxSpeed = currentValidSpeed;
   }
 
   if (lastPosition) {
-    const lastCoord = lastPosition.location.coordinates; // [lon, lat]
+    const lastCoord = lastPosition.location.coordinates;
     const currentCoord = [lon, lat];
     const distance = haversineDistance(currentCoord, lastCoord);
     trip.summary.distance += distance;
@@ -123,6 +123,8 @@ exports.handleTripTracking = async (vehicle, data) => {
 
   trip.updatedAt = new Date();
   await trip.save();
+}
+
 };
 
 
