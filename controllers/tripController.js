@@ -1,7 +1,7 @@
 const Trip = require('../models/Trip');
 const Position = require('../models/Position');
 
-const POSITION_INTERVAL = 60 * 1000; // 1 minute
+const POSITION_INTERVAL = 30 * 1000; // 30 seconds
 
 // 🔁 Haversine formula to calculate distance in km
 function haversineDistance(coord1, coord2) {
@@ -29,6 +29,16 @@ exports.handleTripTracking = async (vehicle, data) => {
   // 🛑 If vehicle stopped, end the trip
   if (!isMoving) {
     if (trip) {
+      const lastPosition = await Position.findOne({ trip: trip._id }).sort({ createdAt: -1 });
+
+      // Add final distance if possible
+      if (lastPosition) {
+        const lastCoord = lastPosition.location.coordinates;
+        const currentCoord = [lon, lat];
+        const distance = haversineDistance(currentCoord, lastCoord);
+        trip.summary.distance += distance;
+      }
+
       trip.status = 'completed';
       trip.endTime = timestamp;
       trip.endLocation = {
@@ -39,14 +49,17 @@ exports.handleTripTracking = async (vehicle, data) => {
       };
 
       const durationMs = trip.endTime - trip.startTime;
-      trip.summary.duration = Math.round(durationMs / 60000); // in minutes
+      const durationMin = durationMs / 60000; // in minutes
+      trip.summary.duration = durationMin;
 
       // ✅ averageSpeed = total distance / duration in hours
-      trip.summary.averageSpeed = trip.summary.duration > 0
-        ? (trip.summary.distance / (trip.summary.duration / 60))
-        : 0;
+      trip.summary.averageSpeed =
+        durationMin > 0 ? (trip.summary.distance / (durationMin / 60)) : 0;
 
       await trip.save();
+
+      // Debug log
+      console.log(`[Trip Ended] Distance: ${trip.summary.distance.toFixed(2)} km | Duration: ${durationMin.toFixed(2)} min | AvgSpeed: ${trip.summary.averageSpeed.toFixed(2)} km/h`);
     }
     return;
   }
