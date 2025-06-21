@@ -6,6 +6,8 @@ const Vehicle = require('../models/Vehicle');
   const moment = require('moment');
   const socket = require('../Utils/socket');
 const geofenceService = require('../services/geofenceService');
+const { handleTripTracking } = require('../controllers/tripController'); 
+
 
   // Configuration for external IMEI validation API
   const DEVICES_API_URL = process.env.DEVICES_API_URL || 'http://www.pogog.ovh:5051/devices';
@@ -330,35 +332,17 @@ exports.handleLiveVehicleData = async (data) => {
   try {
     const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
 
-    if (!IMEI || !lat || !lon) {
-      console.warn('Invalid data received:', data);
-      return;
-    }
+    if (!IMEI || !lat || !lon) return console.warn("Invalid GPS data", data);
 
     const vehicle = await Vehicle.findOne({ imei: IMEI });
+    if (!vehicle) return console.warn(`Vehicle not found: ${IMEI}`);
 
-    if (!vehicle) {
-      console.warn(`Vehicle not found for IMEI ${IMEI}`);
-      return;
-    }
-
-    // 🔁 Get ignition from main data or fallback to extendedData.DIN1
-    let rawIgnition = ignition;
-
-    if (rawIgnition === undefined && extendedData?.DIN1 !== undefined) {
-      rawIgnition = extendedData.DIN1;
-    }
-
-    // ✅ Normalize ignition to boolean (true/false)
-    const isIgnitionOn =
-      rawIgnition === 1 ||
-      rawIgnition === '1' ||
-      rawIgnition === true ||
-      rawIgnition === 'true';
-
+    const rawIgnition = ignition !== undefined ? ignition : extendedData?.DIN1;
+    const isIgnitionOn = ['1', 1, true, 'true'].includes(rawIgnition);
     const isMoving = isIgnitionOn && speedGps > 0;
+    const timestamp = gpsTimestamp ? new Date(gpsTimestamp) : new Date();
 
-    // ❌ Don't change status if immobilized
+    // Ne pas modifier si immobilisé
     if (vehicle.currentStatus !== 'immobilized') {
       vehicle.currentStatus = isMoving
         ? 'moving'
@@ -371,12 +355,20 @@ exports.handleLiveVehicleData = async (data) => {
       lat,
       lon,
       speed: speedGps || 0,
-      timestamp: gpsTimestamp || new Date(),
-      ignition: isIgnitionOn,
+      timestamp,
+      ignition: isIgnitionOn
     };
-
     vehicle.extendedData = extendedData;
     await vehicle.save();
+
+    await handleTripTracking(vehicle, {
+      lat,
+      lon,
+      speedGps,
+      ignition: isIgnitionOn,
+      gpsTimestamp: timestamp,
+      extendedData
+    });
 
     const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
 
@@ -387,20 +379,17 @@ exports.handleLiveVehicleData = async (data) => {
       lon,
       speed: speedGps,
       ignition: isIgnitionOn,
-      timestamp: gpsTimestamp,
+      timestamp,
       extendedData,
-      insideGeofences: insideGeofences.map(g => ({
-        id: g._id,
-        name: g.name,
-        type: g.type,
-      })),
+      insideGeofences: insideGeofences.map(g => ({ id: g._id, name: g.name, type: g.type }))
     };
 
     const io = socket.getIO();
-
     io.to(vehicle.user.toString()).emit('vehicle_data', payload);
     io.to('admins').emit('vehicle_data', payload);
-  } catch (error) {
-    console.error('[TCP] Error in handleLiveVehicleData:', error.message);
+
+  } catch (err) {
+    console.error('[TCP] Live Vehicle Data Error:', err.message);
   }
 };
+
