@@ -4,6 +4,10 @@ const Vehicle = require('../models/Vehicle');
   const AppError = require('../utils/AppError');
   const axios = require('axios');
   const moment = require('moment');
+  const socket = require('../Utils/socket');
+const geofenceService = require('../services/geofenceService');
+const { handleTripTracking } = require('../controllers/tripController'); 
+
 
   // Configuration for external IMEI validation API
   const DEVICES_API_URL = process.env.DEVICES_API_URL || 'http://www.pogog.ovh:5051/devices';
@@ -160,41 +164,12 @@ const Vehicle = require('../models/Vehicle');
       vehicles = await Vehicle.find({ user: req.user.id });
     }
 
-    // Fetch external device data
-    let externalDevices = [];
-    try {
-      const externalResponse = await axios.get('http://www.pogog.ovh:5051/devices');
-      externalDevices = Array.isArray(externalResponse.data) ? externalResponse.data : [];
-    } catch (error) {
-      console.error("Failed to fetch external devices:", error.message);
-      // Proceed with internal data only
-    }
-
-    // Merge external data into vehicles
-    const enrichedVehicles = vehicles.map(vehicle => {
-      const device = externalDevices.find(
-        dev => dev.IMEI?.toString().trim() === vehicle.imei?.toString().trim()
-      );
-    
-      return {
-        ...vehicle.toObject(),
-        telemetry: {
-          vehicleBattery: device?.extendedData?.vehicleBattery,
-          ignition: device?.ignition,
-          speed: device?.speed,
-          lat: device?.lat,
-          lon: device?.lon,
-          timestamp: device?.timestamp
-        }        
-      };
-    }); 
-
     res.status(200).json({
       status: 'success',
-      results: enrichedVehicles.length,
+      results: vehicles.length,
       data: {
-        vehicles: enrichedVehicles
-      }
+        vehicles,
+      },
     });
   });
 
@@ -297,57 +272,45 @@ const Vehicle = require('../models/Vehicle');
    * GET /api/vehicles/stats
    */
   exports.getVehicleStats = catchAsync(async (req, res, next) => {
-    let total, lastMonthCount, currentMonthCount;
+    let total, lastMonthCount, currentMonthCount, activeVehicles, movingVehicles, idleVehicles;
+    const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
 
-    // Check if the user is an admin
-    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
-      // Admins can see stats for all vehicles
-      total = await Vehicle.countDocuments();
+    // Date ranges
+    const lastMonthStart = moment().subtract(1, 'month').startOf('month').toDate();
+    const lastMonthEnd = moment().subtract(1, 'month').endOf('month').toDate();
+    const currentMonthStart = moment().startOf('month').toDate();
+    const now = moment().toDate();
 
-      // Define last month date range
-      const lastMonthStart = moment().subtract(1, 'month').startOf('month').toDate();
-      const lastMonthEnd = moment().subtract(1, 'month').endOf('month').toDate();
+    const baseQuery = isAdmin ? {} : { user: userId };
 
-      // Define current month range
-      const currentMonthStart = moment().startOf('month').toDate();
-      const now = moment().toDate();
+    total = await Vehicle.countDocuments(baseQuery);
 
-      // Count vehicles created in last month
-      lastMonthCount = await Vehicle.countDocuments({
-        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
-      });
+    lastMonthCount = await Vehicle.countDocuments({
+      ...baseQuery,
+      createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
+    });
 
-      // Count vehicles created in current month
-      currentMonthCount = await Vehicle.countDocuments({
-        createdAt: { $gte: currentMonthStart, $lte: now },
-      });
-    } else {
-      // Regular users can only see stats for their own vehicles
-      const userId = req.user.id;
-      total = await Vehicle.countDocuments({ user: userId });
+    currentMonthCount = await Vehicle.countDocuments({
+      ...baseQuery,
+      createdAt: { $gte: currentMonthStart, $lte: now },
+    });
 
-      // Define last month date range
-      const lastMonthStart = moment().subtract(1, 'month').startOf('month').toDate();
-      const lastMonthEnd = moment().subtract(1, 'month').endOf('month').toDate();
+    activeVehicles = await Vehicle.countDocuments({
+      ...baseQuery,
+      currentStatus: { $in: ['moving', 'stopped'] }
+    });
 
-      // Define current month range
-      const currentMonthStart = moment().startOf('month').toDate();
-      const now = moment().toDate();
+    movingVehicles = await Vehicle.countDocuments({
+      ...baseQuery,
+      currentStatus: 'moving'
+    });
 
-      // Count vehicles created in last month
-      lastMonthCount = await Vehicle.countDocuments({
-        user: userId,
-        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
-      });
+    idleVehicles = await Vehicle.countDocuments({
+      ...baseQuery,
+      currentStatus: 'inactive'
+    });
 
-      // Count vehicles created in current month
-      currentMonthCount = await Vehicle.countDocuments({
-        user: userId,
-        createdAt: { $gte: currentMonthStart, $lte: now },
-      });
-    }
-
-    // Calculate difference and signed value
     const rawDiff = currentMonthCount - lastMonthCount;
     const difference = `${rawDiff >= 0 ? '+' : '-'}${Math.abs(rawDiff)}`;
 
@@ -358,6 +321,75 @@ const Vehicle = require('../models/Vehicle');
         lastMonthCount,
         currentMonthCount,
         difference,
+        activeVehicles,
+        movingVehicles,
+        idleVehicles,
       },
     });
   });
+
+exports.handleLiveVehicleData = async (data) => {
+  try {
+    const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
+
+    if (!IMEI || !lat || !lon) return console.warn("Invalid GPS data", data);
+
+    const vehicle = await Vehicle.findOne({ imei: IMEI });
+    if (!vehicle) return console.warn(`Vehicle not found: ${IMEI}`);
+
+    const rawIgnition = ignition !== undefined ? ignition : extendedData?.DIN1;
+    const isIgnitionOn = ['1', 1, true, 'true'].includes(rawIgnition);
+    const isMoving = isIgnitionOn && speedGps > 0;
+    const timestamp = gpsTimestamp ? new Date(gpsTimestamp) : new Date();
+
+    // Ne pas modifier si immobilisé
+    if (vehicle.currentStatus !== 'immobilized') {
+      vehicle.currentStatus = isMoving
+        ? 'moving'
+        : isIgnitionOn
+        ? 'stopped'
+        : 'inactive';
+    }
+
+    vehicle.lastPosition = {
+      lat,
+      lon,
+      speed: speedGps || 0,
+      timestamp,
+      ignition: isIgnitionOn
+    };
+    vehicle.extendedData = extendedData;
+    await vehicle.save();
+
+    await handleTripTracking(vehicle, {
+      lat,
+      lon,
+      speedGps,
+      ignition: isIgnitionOn,
+      gpsTimestamp: timestamp,
+      extendedData
+    });
+
+    const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
+
+    const payload = {
+      vehicleId: vehicle._id,
+      imei: IMEI,
+      lat,
+      lon,
+      speed: speedGps,
+      ignition: isIgnitionOn,
+      timestamp,
+      extendedData,
+      insideGeofences: insideGeofences.map(g => ({ id: g._id, name: g.name, type: g.type }))
+    };
+
+    const io = socket.getIO();
+    io.to(vehicle.user.toString()).emit('vehicle_data', payload);
+    io.to('admins').emit('vehicle_data', payload);
+
+  } catch (err) {
+    console.error('[TCP] Live Vehicle Data Error:', err.message);
+  }
+};
+

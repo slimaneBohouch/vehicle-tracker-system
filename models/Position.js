@@ -53,7 +53,8 @@ const positionSchema = new mongoose.Schema({
   },
   trip: {
     type: mongoose.Schema.ObjectId,
-    ref: 'Trip'
+    ref: 'Trip',
+    required: true
   },
   createdAt: {
     type: Date,

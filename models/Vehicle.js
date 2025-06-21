@@ -33,6 +33,15 @@ const vehicleSchema = new mongoose.Schema({
     enum: ['moving', 'stopped', 'immobilized', 'inactive'],
     default: 'inactive'
   },
+  lastPosition: {
+    lat: Number,
+    lon: Number,
+    speed: Number,
+    timestamp: Date,
+    satellites: Number,
+    ignition: Boolean,
+    movement: Boolean
+  },
   lastLocation: {
     type: {
       type: String,
@@ -52,29 +61,16 @@ const vehicleSchema = new mongoose.Schema({
       default: 0
     }
   },
-  immobilizationHistory: [
-    {
-      status: {
-        type: Boolean,
-        required: true
-      },
-      timestamp: {
-        type: Date,
-        default: Date.now
-      },
-      reason: String,
-      triggeredBy: {
-        type: mongoose.Schema.ObjectId,
-        ref: 'User'
-      }
-    }
-  ],
-  assignedGeofences: [
-    {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Geofence'
-    }
-  ],
+  extendedData: {
+    vehicleBattery: Number,
+    DIN1: Number,
+    externalVoltageExtanded: Number,
+    totalOdometer: Number,
+    tripOdometer: Number,
+    x: Number,
+    y: Number,
+    z: Number
+  },
   createdAt: {
     type: Date,
     default: Date.now

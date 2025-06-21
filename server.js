@@ -11,7 +11,6 @@ const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
 const cors = require('cors');
 const http = require('http');
-const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
 
 const errorHandler = require('./middleware/error');
@@ -19,12 +18,13 @@ const connectDB = require('./config/db');
 const auth = require('./routes/auth');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const geofenceRoutes = require('./routes/geofenceRoutes');
+const userRoutes = require('./routes/userRoutes');
+const alertRuleRoutes = require('./routes/alertRuleRoutes');
 const geofenceService = require('./services/geofenceService');
 const User = require('./models/User');
-const userRoutes = require('./routes/userRoutes')
-const alertRuleRoutes = require('./routes/alertRuleRoutes');
-
-
+const socket = require('./Utils/socket');
+const immobilizationRoutes = require('./routes/immobilizationRoutes');
+const tripRoutes = require('./routes/tripRoutes');
 
 dotenv.config();
 connectDB();
@@ -33,11 +33,7 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
-
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
-
+if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 app.use(mongoSanitize());
 app.use(helmet());
 app.use(xss());
@@ -48,17 +44,16 @@ app.options('*', cors());
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
-  setHeaders: (res, path) => {
+  setHeaders: (res) => {
     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   }
 }));
 
-// Middleware to attach user from JWT cookie
+// Middleware JWT
 app.use(async (req, res, next) => {
   const token = req.cookies.token;
   if (!token) return next();
-
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = await User.findById(decoded.id);
@@ -68,60 +63,34 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Update lastActive if logged in
 app.use(async (req, res, next) => {
   if (req.user) {
     const now = new Date();
     const diffMs = now - new Date(req.user.lastActive || 0);
-    const threshold = 1000 * 60 * 5;
-    if (diffMs > threshold) {
+    if (diffMs > 1000 * 60 * 5) {
       await User.findByIdAndUpdate(req.user._id, { lastActive: now });
     }
   }
   next();
 });
 
-// API Routes
+// Routes
 app.use('/api/v1/auth', auth);
 app.use('/api/v1/vehicles', vehicleRoutes);
 app.use('/api/v1/geofences', geofenceRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/alert-rules', alertRuleRoutes);
+app.use('/api/v1/immobilizations', immobilizationRoutes);
+app.use('/api/v1/trips', tripRoutes);
 
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 const httpServer = http.createServer(app);
-const io = socketIo(httpServer, {
-  cors: {
-    origin: "http://localhost:5173",
-    credentials: true
-  }
-});
+const io = socket.init(httpServer);
 
-io.on('connection', (socket) => {
-  console.log('Client connected');
-
-  socket.on('position_update', async (data) => {
-    if (data.vehicleId && data.lat && data.lon) {
-      const position = { lat: data.lat, lon: data.lon };
-      const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(data.vehicleId, position);
-
-      socket.emit('geofence_status', {
-        vehicleId: data.vehicleId,
-        insideGeofences: insideGeofences.map(g => ({
-          id: g._id,
-          name: g.name,
-          type: g.type
-        }))
-      });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
-});
+const { setupTCPListener } = require('./services/tcpReceiver');
+setupTCPListener();
 
 httpServer.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.blue.bold);

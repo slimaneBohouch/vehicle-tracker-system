@@ -4,6 +4,7 @@ const Geofence = require('../models/Geofence');
   const asyncHandler = require('../middleware/async');
   const ErrorResponse = require('../Utils/errorResponse');
   const axios = require('axios');
+  const mongoose = require('mongoose'); // Import mongoose to use ObjectId
 
   /**
    * @desc    Create a new geofence
@@ -313,3 +314,25 @@ exports.checkAllVehicleGeofences = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({ success: true, count: results.length, data: results });
 });
+
+  /**
+   * @desc    Get geofence based on vehicle ID
+   * @route   GET /api/geofences/vehicle/:vehicleId
+   * @access  Private
+   */
+  exports.getGeofenceByVehicleId = asyncHandler(async (req, res, next) => {
+   const vehicleId = req.params.vehicleId || req.query.vehicleId;
+
+    // Validate and cast vehicleId to ObjectId
+    if (!mongoose.Types.ObjectId.isValid(vehicleId)) {
+      return next(new ErrorResponse(`Invalid vehicle ID: ${vehicleId}`, 400));
+    }
+
+    const geofence = await Geofence.findOne({ vehicles: new mongoose.Types.ObjectId(vehicleId) });
+
+
+    res.status(200).json({
+      success: true,
+      data: geofence || null, 
+    });
+  });

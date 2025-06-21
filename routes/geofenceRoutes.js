@@ -6,7 +6,8 @@ const {
   updateGeofence,
   deleteGeofence,
   assignVehiclesToGeofence,
-  checkAllVehicleGeofences
+  checkAllVehicleGeofences,
+  getGeofenceByVehicleId
 } = require('../controllers/geofenceController');
 
 // Middleware
@@ -36,5 +37,7 @@ router.route('/:id/vehicles')
   .put(assignVehiclesToGeofence);
 
 
+router.route('/vehicle/:vehicleId')
+  .get(getGeofenceByVehicleId);
 
 module.exports = router;

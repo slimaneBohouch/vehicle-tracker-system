@@ -35,21 +35,6 @@ const immobilizationSchema = new mongoose.Schema({
       type: [Number], // [longitude, latitude]
     }
   },
-  commandSent: {
-    type: Boolean,
-    default: false
-  },
-  commandAcknowledged: {
-    type: Boolean,
-    default: false
-  },
-  acknowledgedAt: {
-    type: Date
-  },
-  notes: {
-    type: String,
-    trim: true
-  },
   createdAt: {
     type: Date,
     default: Date.now
