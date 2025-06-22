@@ -5,8 +5,12 @@ const Vehicle = require('../models/Vehicle');
   const axios = require('axios');
   const moment = require('moment');
   const socket = require('../Utils/socket');
+  const AlertRule = require('../models/AlertRule');
+  const Alert = require('../models/Alert');
 const geofenceService = require('../services/geofenceService');
-const { handleTripTracking } = require('../controllers/tripController'); 
+const { handleTripTracking } = require('../controllers/tripController');
+const { createAlert } = require('../services/alertService');
+
 
 
   // Configuration for external IMEI validation API
@@ -332,9 +336,11 @@ exports.handleLiveVehicleData = async (data) => {
   try {
     const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
 
-    if (!IMEI || !lat || !lon) return console.warn("Invalid GPS data", data);
+    if (!IMEI || !lat || !lon) {
+      return console.warn("Invalid GPS data", data);
+    }
 
-    const vehicle = await Vehicle.findOne({ imei: IMEI });
+    const vehicle = await Vehicle.findOne({ imei: IMEI }).populate('user');
     if (!vehicle) return console.warn(`Vehicle not found: ${IMEI}`);
 
     const rawIgnition = ignition !== undefined ? ignition : extendedData?.DIN1;
@@ -342,45 +348,103 @@ exports.handleLiveVehicleData = async (data) => {
     const isMoving = isIgnitionOn && speedGps > 0;
     const timestamp = gpsTimestamp ? new Date(gpsTimestamp) : new Date();
 
-    // Ne pas modifier si immobilisé
-if (vehicle.currentStatus !== 'immobilized') {
-  const rawBattery = extendedData?.vehicleBattery;
-  const battery = rawBattery !== undefined && rawBattery !== null ? Number(rawBattery) : null;
-  const isBatteryDead = battery === null || isNaN(battery) || battery === 0;
+    // Skip status update if immobilized
+    if (vehicle.currentStatus !== 'immobilized') {
+      const rawBattery = extendedData?.vehicleBattery;
+      const battery = rawBattery !== undefined ? Number(rawBattery) : null;
+      const isBatteryDead = battery === null || isNaN(battery) || battery === 0;
 
-  if (isBatteryDead) {
-    vehicle.currentStatus = 'inactive';
-  } else {
-    vehicle.currentStatus = isMoving
-      ? 'moving'
-      : isIgnitionOn
-      ? 'stopped'
-      : 'inactive';
-  }
-}
-
+      vehicle.currentStatus = isBatteryDead
+        ? 'inactive'
+        : isMoving
+        ? 'moving'
+        : isIgnitionOn
+        ? 'stopped'
+        : 'inactive';
+    }
 
     vehicle.lastPosition = {
       lat,
       lon,
       speed: speedGps || 0,
       timestamp,
-      ignition: isIgnitionOn
+      ignition: isIgnitionOn,
     };
     vehicle.extendedData = extendedData;
     await vehicle.save();
 
+    // Socket instance
+    const io = socket.getIO();
+
+    // Helper to emit alerts
+    function emitAlertToClients(type, message, data = {}) {
+      const alertPayload = {
+        vehicleId: vehicle._id,
+        vehicleName: vehicle.name,
+        vehiclePlate: vehicle.licensePlate,
+        type,
+        message,
+        timestamp: new Date(),
+        data,
+      };
+      io.to(vehicle.user._id.toString()).emit('alert', alertPayload);
+      io.to('admins').emit('alert', { ...alertPayload, user: vehicle.user });
+    }
+
+    // Fetch enabled alert rules
+    const alertRules = await AlertRule.find({ enabled: true });
+
+    for (const rule of alertRules) {
+      switch (rule.type) {
+        case 'SPEED_ALERT':
+          if (speedGps > rule.threshold) {
+            const message = `Speed exceeded ${rule.threshold} km/h`;
+            await createAlert(vehicle, 'SPEED_ALERT', message, { speed: speedGps });
+            emitAlertToClients('SPEED_ALERT', message, { speed: speedGps });
+          }
+          break;
+
+        case 'BATTERY_ALERT': {
+          const voltage = Number(extendedData?.vehicleBattery || 0);
+
+          if (voltage >= rule.threshold) {
+            await Alert.updateMany(
+              { vehicleId: vehicle._id, type: 'BATTERY_ALERT', resolved: false },
+              { resolved: true, resolvedAt: new Date() }
+            );
+          } else if (voltage < rule.threshold) {
+            const message = `Battery low: ${voltage}%`;
+            await createAlert(vehicle, 'BATTERY_ALERT', message, { battery: voltage });
+            emitAlertToClients('BATTERY_ALERT', message, { battery: voltage });
+          }
+          break;
+        }
+
+        // GEOFENCE alerts will be handled after geofence check
+        case 'GEOFENCE_EXIT':
+        case 'GEOFENCE_ENTRY':
+          // You can implement logic after geofence status below
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    // Track trip
     await handleTripTracking(vehicle, {
       lat,
       lon,
       speedGps,
       ignition: isIgnitionOn,
       gpsTimestamp: timestamp,
-      extendedData
+      extendedData,
     });
 
+    // Geofence check
     const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
 
+    // Emit live position
     const payload = {
       vehicleId: vehicle._id,
       imei: IMEI,
@@ -390,15 +454,18 @@ if (vehicle.currentStatus !== 'immobilized') {
       ignition: isIgnitionOn,
       timestamp,
       extendedData,
-      insideGeofences: insideGeofences.map(g => ({ id: g._id, name: g.name, type: g.type }))
+      insideGeofences: insideGeofences.map((g) => ({
+        id: g._id,
+        name: g.name,
+        type: g.type,
+      })),
     };
 
-    const io = socket.getIO();
-    io.to(vehicle.user.toString()).emit('vehicle_data', payload);
+    io.to(vehicle.user._id.toString()).emit('vehicle_data', payload);
     io.to('admins').emit('vehicle_data', payload);
-
   } catch (err) {
     console.error('[TCP] Live Vehicle Data Error:', err.message);
   }
 };
+
 
