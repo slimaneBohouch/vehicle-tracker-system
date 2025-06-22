@@ -406,7 +406,7 @@ exports.handleLiveVehicleData = async (data) => {
         case 'SPEED_ALERT':
           if (speedGps > rule.threshold) {
             const message = `Speed exceeded ${rule.threshold} km/h`;
-            await createAlert(vehicle, 'SPEED_ALERT', message, { speed: speedGps });
+            await createAlert(vehicle, 'SPEED_ALERT', message, { speed: speedGps, lat, lon });
             emitAlertToClients('SPEED_ALERT', message, { speed: speedGps });
           }
           break;
@@ -421,7 +421,7 @@ exports.handleLiveVehicleData = async (data) => {
             );
           } else if (voltage < rule.threshold) {
             const message = `Battery low: ${voltage}%`;
-            await createAlert(vehicle, 'BATTERY_ALERT', message, { battery: voltage });
+            await createAlert(vehicle, 'BATTERY_ALERT', message, { battery: voltage, lat, lon });
             emitAlertToClients('BATTERY_ALERT', message, { battery: voltage });
           }
           break;
