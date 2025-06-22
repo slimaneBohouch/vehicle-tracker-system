@@ -201,24 +201,24 @@ const Geofence = require('../models/Geofence');
       );
     }
 
-    // Make sure user owns the geofence
-    if (geofence.user.toString() !== req.user.id) {
+    // Allow admin/superadmin to assign any vehicles to any geofence
+    const isPrivileged = req.user.role === 'admin' || req.user.role === 'superadmin';
+
+    if (!isPrivileged && geofence.user.toString() !== req.user.id) {
       return next(
         new ErrorResponse(`User not authorized to update this geofence`, 401)
       );
     }
 
-    // Verify all vehicles exist and belong to user
+    // Verify all vehicles exist (ownership check only for regular users)
     for (const vehicleId of vehicles) {
       const vehicle = await Vehicle.findById(vehicleId);
-      
       if (!vehicle) {
         return next(
           new ErrorResponse(`Vehicle not found with id of ${vehicleId}`, 404)
         );
       }
-      
-      if (vehicle.user.toString() !== req.user.id) {
+      if (!isPrivileged && vehicle.user.toString() !== req.user.id) {
         return next(
           new ErrorResponse(`User not authorized to assign vehicle ${vehicleId}`, 401)
         );

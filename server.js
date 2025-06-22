@@ -12,7 +12,7 @@ const hpp = require('hpp');
 const cors = require('cors');
 const http = require('http');
 const jwt = require('jsonwebtoken');
-
+const cron = require("node-cron");
 const errorHandler = require('./middleware/error');
 const connectDB = require('./config/db');
 const auth = require('./routes/auth');
@@ -25,6 +25,7 @@ const User = require('./models/User');
 const socket = require('./Utils/socket');
 const immobilizationRoutes = require('./routes/immobilizationRoutes');
 const tripRoutes = require('./routes/tripRoutes');
+const alertRoutes = require('./routes/alertRoutes');
 
 dotenv.config();
 connectDB();
@@ -82,8 +83,25 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/alert-rules', alertRuleRoutes);
 app.use('/api/v1/immobilizations', immobilizationRoutes);
 app.use('/api/v1/trips', tripRoutes);
+app.use('/api/v1/alerts', alertRoutes);
 
 app.use(errorHandler);
+
+
+const closeInactiveTrips = require("./jobs/tripCleanup");
+const markInactiveVehicles = require('./jobs/inactiveVehiclesJob');
+
+// Run every 2 minutes
+cron.schedule("*/2 * * * *", async () => {
+  console.log("🔁 Running cron job to close inactive trips...");
+  await closeInactiveTrips();
+});
+
+cron.schedule('*/5 * * * *', async () => {
+  console.log('[CRON] Checking for inactive vehicles...');
+  await markInactiveVehicles();
+});
+
 
 const PORT = process.env.PORT || 5000;
 const httpServer = http.createServer(app);

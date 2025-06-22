@@ -124,28 +124,3 @@ exports.createCircularGeofence = async (userData, name, center, radius, vehicles
   
   return await Geofence.create(geofenceData);
 };
-
-/**
- * Create a new polygon geofence
- * @param {Object} userData - User data including id
- * @param {String} name - Geofence name
- * @param {Array} coordinates - Array of {lat, lon} objects forming the polygon
- * @param {Array} vehicles - Array of vehicle IDs to assign
- * @returns {Object} Created geofence
- */
-exports.createPolygonGeofence = async (userData, name, coordinates, vehicles = []) => {
-  if (!Array.isArray(coordinates) || coordinates.length < 3) {
-    throw new Error('Polygon must have at least 3 points');
-  }
-  
-  const geofenceData = {
-    name,
-    type: 'polygon',
-    coordinates,
-    vehicles,
-    user: userData.id,
-    description: `Polygon geofence with ${coordinates.length} points`
-  };
-  
-  return await Geofence.create(geofenceData);
-};

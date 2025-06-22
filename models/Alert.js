@@ -31,6 +31,10 @@ const AlertSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  location: {
+    type: String,
+  },
+  
   resolvedAt: {
     type: Date
   },
