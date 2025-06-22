@@ -343,13 +343,22 @@ exports.handleLiveVehicleData = async (data) => {
     const timestamp = gpsTimestamp ? new Date(gpsTimestamp) : new Date();
 
     // Ne pas modifier si immobilisé
-    if (vehicle.currentStatus !== 'immobilized') {
-      vehicle.currentStatus = isMoving
-        ? 'moving'
-        : isIgnitionOn
-        ? 'stopped'
-        : 'inactive';
-    }
+if (vehicle.currentStatus !== 'immobilized') {
+  const rawBattery = extendedData?.vehicleBattery;
+  const battery = rawBattery !== undefined && rawBattery !== null ? Number(rawBattery) : null;
+  const isBatteryDead = battery === null || isNaN(battery) || battery === 0;
+
+  if (isBatteryDead) {
+    vehicle.currentStatus = 'inactive';
+  } else {
+    vehicle.currentStatus = isMoving
+      ? 'moving'
+      : isIgnitionOn
+      ? 'stopped'
+      : 'inactive';
+  }
+}
+
 
     vehicle.lastPosition = {
       lat,
