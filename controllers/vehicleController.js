@@ -10,6 +10,8 @@ const Vehicle = require('../models/Vehicle');
 const geofenceService = require('../services/geofenceService');
 const { handleTripTracking } = require('../controllers/tripController');
 const { createAlert } = require('../services/alertService');
+const geocodingService = require('../services/geocodingService');
+
 
 
 
@@ -377,19 +379,24 @@ exports.handleLiveVehicleData = async (data) => {
     const io = socket.getIO();
 
     // Helper to emit alerts
-    function emitAlertToClients(type, message, data = {}) {
-      const alertPayload = {
-        vehicleId: vehicle._id,
-        vehicleName: vehicle.name,
-        vehiclePlate: vehicle.licensePlate,
-        type,
-        message,
-        timestamp: new Date(),
-        data,
-      };
-      io.to(vehicle.user._id.toString()).emit('alert', alertPayload);
-      io.to('admins').emit('alert', { ...alertPayload, user: vehicle.user });
-    }
+ async function emitAlertToClients(type, message, data = {}) {
+  const address = await geocodingService.reverseGeocode(lat, lon);
+
+  const alertPayload = {
+    vehicleId: vehicle._id,
+    vehicleName: vehicle.name,
+    vehiclePlate: vehicle.licensePlate,
+    type,
+    message,
+    timestamp: new Date(),
+    location: address || "Unknown location",
+    data,
+  };
+
+  io.to(vehicle.user._id.toString()).emit('alert', alertPayload);
+  io.to('admins').emit('alert', { ...alertPayload, user: vehicle.user });
+}
+
 
     // Fetch enabled alert rules
     const alertRules = await AlertRule.find({ enabled: true });
