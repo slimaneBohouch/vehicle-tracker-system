@@ -87,11 +87,17 @@ app.use(errorHandler);
 
 
 const closeInactiveTrips = require("./jobs/tripCleanup");
+const markInactiveVehicles = require('./jobs/inactiveVehiclesJob');
 
 // Run every 2 minutes
 cron.schedule("*/2 * * * *", async () => {
   console.log("🔁 Running cron job to close inactive trips...");
   await closeInactiveTrips();
+});
+
+cron.schedule('*/5 * * * *', async () => {
+  console.log('[CRON] Checking for inactive vehicles...');
+  await markInactiveVehicles();
 });
 
 
