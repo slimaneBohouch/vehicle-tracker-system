@@ -40,7 +40,7 @@ exports.getActiveAlerts = async (req, res) => {
   }
 };
 
-// ✅ GET /api/alerts/resolved
+
 exports.resolvedAlerts = async (req, res) => {
   try {
     const user = req.user;

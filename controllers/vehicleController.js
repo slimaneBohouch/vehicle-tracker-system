@@ -375,7 +375,7 @@ exports.handleLiveVehicleData = async (data) => {
 
     // Geofencing check
     const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
-
+    
     // Apply alert rules
     const alertRules = await AlertRule.find({ enabled: true });
 
