@@ -101,3 +101,37 @@ exports.resolvedAlerts = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch resolved alerts' });
   }
 };
+
+exports.latestAlerts = async (req, res) => {
+  try {
+    const user = req.user;
+    const filter = {};
+
+    // Restrict to user's vehicles if not admin/superadmin
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
+      filter['vehicleId'] = { $in: user.vehicles || [] };
+    }
+
+    const alerts = await Alert.find(filter)
+      .sort({ timestamp: -1 })
+      .limit(4)
+      .populate('vehicleId', 'name licensePlate');
+
+    const response = alerts.map(alert => ({
+      _id: alert._id,
+      vehicleId: alert.vehicleId._id,
+      vehicleName: alert.vehicleId.name,
+      vehicleLicensePlate: alert.vehicleId.licensePlate,
+      type: alert.type,
+      message: alert.message,
+      timestamp: alert.timestamp,
+      location: alert.location,
+      data: alert.data,
+    }));
+
+    res.json(response);
+  } catch (err) {
+    console.error('[Alert Latest Alerts Error]', err.message);
+    res.status(500).json({ error: 'Failed to fetch latest alerts' });
+  }
+};

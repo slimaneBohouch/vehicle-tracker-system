@@ -8,4 +8,5 @@ router.use(protect);
 router.get('/active',  alertController.getActiveAlerts);
 router.get('/stats', alertController.stats);
 router.get('/history', alertController.resolvedAlerts);
+router.get('/latest', alertController.latestAlerts);
 module.exports = router;
