@@ -348,7 +348,6 @@ exports.handleLiveVehicleData = async (data) => {
     const isMoving = isIgnitionOn && speedGps > 0;
     const timestamp = gpsTimestamp ? new Date(gpsTimestamp) : new Date();
 
-    // Skip update if immobilized
     if (vehicle.currentStatus !== 'immobilized') {
       const rawBattery = extendedData?.vehicleBattery;
       const battery = rawBattery !== undefined ? Number(rawBattery) : null;
@@ -373,6 +372,9 @@ exports.handleLiveVehicleData = async (data) => {
 
     vehicle.extendedData = extendedData;
     await vehicle.save();
+
+    // Geofencing check
+    const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
 
     // Apply alert rules
     const alertRules = await AlertRule.find({ enabled: true });
@@ -399,8 +401,6 @@ exports.handleLiveVehicleData = async (data) => {
           }
           break;
         }
-
-        // Optional: add GEOFENCE_ENTRY / EXIT cases here
       }
     }
 
@@ -414,9 +414,7 @@ exports.handleLiveVehicleData = async (data) => {
       extendedData,
     });
 
-    // Geofencing check
-    const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
-
+    // Send to frontend via socket.io
     const io = socket.getIO();
     const livePayload = {
       vehicleId: vehicle._id,
