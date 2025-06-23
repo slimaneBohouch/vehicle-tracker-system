@@ -381,7 +381,7 @@ exports.handleLiveVehicleData = async (data) => {
       switch (rule.type) {
         case 'SPEED_ALERT':
           if (speedGps > rule.threshold) {
-            const msg = `Speed exceeded ${rule.threshold} km/h`;
+            const msg = `Vehicle speed: ${speedGps} km/h`;
             await createAlert(vehicle, 'SPEED_ALERT', msg, { speed: speedGps, lat, lon });
           }
           break;
