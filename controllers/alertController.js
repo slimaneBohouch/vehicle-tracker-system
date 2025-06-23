@@ -68,7 +68,7 @@ exports.stats = async (req, res) => {
   }
 };
 
-exports.resolvedAlert = async (req, res) => {
+exports.resolvedAlerts = async (req, res) => {
   try {
     const user = req.user;
     const filter = {};
