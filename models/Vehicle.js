@@ -71,6 +71,19 @@ const vehicleSchema = new mongoose.Schema({
     y: Number,
     z: Number
   },
+lastGeofenceStatus: {
+  type: Map,
+  of: new mongoose.Schema({
+    inside: { type: Boolean, default: false },            // état logique : dans la zone ou pas
+    entryAlertSent: { type: Boolean, default: false },    // entrée déjà alertée ?
+    exitAlertSent: { type: Boolean, default: false },     // sortie déjà alertée ?
+  }, { _id: false }),
+  default: {}
+},
+
+  lastSpeedAlerted: { type: Boolean, default: false },
+lastBatteryAlerted: { type: Boolean, default: false },
+
   createdAt: {
     type: Date,
     default: Date.now

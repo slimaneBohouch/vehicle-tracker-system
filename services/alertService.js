@@ -4,25 +4,52 @@ const socket = require('../Utils/socket');
 
 exports.createAlert = async function (vehicle, type, message, data = {}) {
   try {
-    // Vérifie s'il existe déjà une alerte non résolue de ce type
-    const existing = await Alert.findOne({
-      vehicleId: vehicle._id,
-      type,
-      resolved: false,
-    });
-
-    if (existing) return;
-
-    // Extraction latitude/longitude
     const lat = data.lat || data?.location?.lat;
     const lon = data.lon || data?.location?.lon;
 
     let location = null;
     if (lat && lon) {
-      location = await geocodingService.reverseGeocode(lat, lon);
+      try {
+        location = await geocodingService.reverseGeocode(lat, lon);
+      } catch (err) {
+        console.warn('[Alert] Reverse geocoding failed:', err.message);
+      }
     }
 
-    // Création et sauvegarde de l’alerte
+    // Résolution automatique d'une entrée lorsqu'on sort
+    if (type === 'GEOFENCE_EXIT' && data.geofenceId) {
+      await Alert.updateMany(
+        {
+          vehicleId: vehicle._id,
+          type: 'GEOFENCE_ENTRY',
+          'data.geofenceId': data.geofenceId,
+          resolved: false,
+        },
+        {
+          resolved: true,
+          resolvedAt: new Date(),
+        }
+      );
+    }
+
+    // Vérifie les doublons — UNIQUEMENT si une alerte identique (même type + geofenceId) existe déjà
+    const query = {
+      vehicleId: vehicle._id,
+      type,
+      resolved: false,
+    };
+
+    if (data.geofenceId) {
+      query['data.geofenceId'] = data.geofenceId;
+    }
+
+    const existing = await Alert.findOne(query);
+    if (existing) {
+       console.log(`[ALERT] Skipped duplicate alert ${type} for geofence ${data.geofenceId}`);
+      return;
+    }
+
+    // Création de l’alerte
     const alertDoc = await Alert.create({
       vehicleId: vehicle._id,
       type,
@@ -32,9 +59,6 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       location,
     });
 
-    console.log(`[ALERT] ${type} triggered for ${vehicle.name}`);
-
-    // Envoi via Socket.IO
     const io = socket.getIO();
     const alertPayload = {
       vehicleId: vehicle._id,
