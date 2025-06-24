@@ -16,23 +16,34 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       }
     }
 
-    // Résolution automatique d'une entrée lorsqu'on sort
-    if (type === 'GEOFENCE_EXIT' && data.geofenceId) {
-      await Alert.updateMany(
-        {
-          vehicleId: vehicle._id,
-          type: 'GEOFENCE_ENTRY',
-          'data.geofenceId': data.geofenceId,
-          resolved: false,
-        },
-        {
-          resolved: true,
-          resolvedAt: new Date(),
-        }
-      );
+    // ✅ Auto-resolve opposite alert when entering or exiting
+    if (data.geofenceId) {
+      if (type === 'GEOFENCE_EXIT') {
+        await Alert.updateMany(
+          {
+            vehicleId: vehicle._id,
+            type: 'GEOFENCE_ENTRY',
+            'data.geofenceId': data.geofenceId,
+            resolved: false,
+          },
+          { resolved: true, resolvedAt: new Date() }
+        );
+      }
+
+      if (type === 'GEOFENCE_ENTRY') {
+        await Alert.updateMany(
+          {
+            vehicleId: vehicle._id,
+            type: 'GEOFENCE_EXIT',
+            'data.geofenceId': data.geofenceId,
+            resolved: false,
+          },
+          { resolved: true, resolvedAt: new Date() }
+        );
+      }
     }
 
-    // Vérifie les doublons — UNIQUEMENT si une alerte identique (même type + geofenceId) existe déjà
+    // Check for duplicate alerts
     const query = {
       vehicleId: vehicle._id,
       type,
@@ -45,11 +56,10 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
 
     const existing = await Alert.findOne(query);
     if (existing) {
-       console.log(`[ALERT] Skipped duplicate alert ${type} for geofence ${data.geofenceId}`);
+      console.log(`[ALERT] Skipped duplicate alert ${type} for geofence ${data.geofenceId}`);
       return;
     }
 
-    // Création de l’alerte
     const alertDoc = await Alert.create({
       vehicleId: vehicle._id,
       type,
@@ -58,6 +68,8 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       timestamp: new Date(),
       location,
     });
+
+    console.log(`[ALERT] ${type} created for vehicle ${vehicle.name}`);
 
     const io = socket.getIO();
     const alertPayload = {
