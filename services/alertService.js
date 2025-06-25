@@ -73,23 +73,20 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
     });
 
 try {
-  // Incrémenter pour le user lié au véhicule (si existe)
-  if (vehicle.user && vehicle.user._id) {
-    await User.findByIdAndUpdate(vehicle.user._id, {
-      $inc: { alertCounter: 1 },
-    });
-  } else {
-    console.warn("[ALERT] No user attached to vehicle. Skipping user alert counter increment.");
-  }
+  // Incrémenter pour le user du véhicule
+  await User.findByIdAndUpdate(vehicle.user._id, {
+    $inc: { alertCounter: 1 },
+  });
 
-  // Incrémenter pour tous les admins et superadmins
+  // Incrémenter pour les autres admins/superadmins sauf ce user
   await User.updateMany(
-    { role: { $in: ["admin", "superadmin"] } },
+    { role: { $in: ["admin", "superadmin"] }, _id: { $ne: vehicle.user._id } },
     { $inc: { alertCounter: 1 } }
   );
 } catch (err) {
   console.error("[ALERT] Failed to increment alert counters:", err.message);
 }
+
 
 
     console.log(`[ALERT] ${type} created for vehicle ${vehicle.name}`);
