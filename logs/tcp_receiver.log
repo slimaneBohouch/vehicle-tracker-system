@@ -1,0 +1,10 @@
+[25/06/2025 16:21:22] [TCP] 🔌 Trying to connect to server...
+[25/06/2025 16:21:22] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[25/06/2025 16:21:28] [TCP] 🔌 Trying to connect to server...
+[25/06/2025 16:21:28] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[25/06/2025 16:24:02] [TCP] ❌ Socket Error: read ECONNRESET
+[25/06/2025 16:24:02] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[25/06/2025 16:24:02] [TCP] ❌ Connection closed due to error
+[25/06/2025 16:24:02] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[25/06/2025 16:24:07] [TCP] 🔌 Trying to connect to server...
+[25/06/2025 16:24:07] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
