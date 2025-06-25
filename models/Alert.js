@@ -13,10 +13,7 @@ const AlertSchema = new mongoose.Schema({
       'SPEED_ALERT', 
       'BATTERY_ALERT', 
       'GEOFENCE_EXIT',
-      'GEOFENCE_ENTRY', 
-      'TIME_RESTRICTION', 
-      'MOVEMENT_ALERT', 
-      'SYSTEM_ALERT'
+      'GEOFENCE_ENTRY',
     ]
   },
   message: {

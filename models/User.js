@@ -40,6 +40,10 @@ const UserSchema = new mongoose.Schema({
     enum: ['active', 'inactive'],
     default: 'active'
   },
+  alertCounter: {
+    type: Number,
+    default: 0
+  },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   createdAt: {

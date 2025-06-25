@@ -116,3 +116,11 @@ exports.getUserVehicleStats = async (req, res, next) => {
   }
 };
 
+exports.resetAlertCounter = async (req, res) => {
+  try {
+    await req.user.updateOne({ alertCounter: 0 });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset alert counter' });
+  }
+};

@@ -337,10 +337,7 @@ const geocodingService = require('../services/geocodingService');
 exports.handleLiveVehicleData = async (data) => {
   try {
     const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
-
-    if (!IMEI || !lat || !lon) {
-      return console.warn("Invalid GPS data", data);
-    }
+    if (!IMEI || !lat || !lon) return console.warn("Invalid GPS data", data);
 
     const vehicle = await Vehicle.findOne({ imei: IMEI }).populate('user');
     if (!vehicle) return console.warn(`Vehicle not found: ${IMEI}`);
@@ -350,12 +347,11 @@ exports.handleLiveVehicleData = async (data) => {
     const isMoving = isIgnitionOn && speedGps > 0;
     const timestamp = gpsTimestamp ? new Date(gpsTimestamp) : new Date();
 
-    // Skip status update if immobilized
-    if (vehicle.currentStatus !== 'immobilized') {
-      const rawBattery = extendedData?.vehicleBattery;
-      const battery = rawBattery !== undefined ? Number(rawBattery) : null;
-      const isBatteryDead = battery === null || isNaN(battery) || battery === 0;
+    const rawBattery = extendedData?.vehicleBattery;
+    const battery = rawBattery !== undefined ? Number(rawBattery) : null;
+    const isBatteryDead = battery === null || isNaN(battery) || battery === 0;
 
+    if (vehicle.currentStatus !== 'immobilized') {
       vehicle.currentStatus = isBatteryDead
         ? 'inactive'
         : isMoving
@@ -372,73 +368,47 @@ exports.handleLiveVehicleData = async (data) => {
       timestamp,
       ignition: isIgnitionOn,
     };
+
     vehicle.extendedData = extendedData;
-    await vehicle.save();
 
-    // Socket instance
-    const io = socket.getIO();
+    const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
 
-    // Helper to emit alerts
- async function emitAlertToClients(type, message, data = {}) {
-  const address = await geocodingService.reverseGeocode(lat, lon);
-
-  const alertPayload = {
-    vehicleId: vehicle._id,
-    vehicleName: vehicle.name,
-    vehiclePlate: vehicle.licensePlate,
-    type,
-    message,
-    timestamp: new Date(),
-    location: address || "Unknown location",
-    data,
-  };
-
-  io.to(vehicle.user._id.toString()).emit('alert', alertPayload);
-  io.to('admins').emit('alert', { ...alertPayload, user: vehicle.user });
-}
-
-
-    // Fetch enabled alert rules
     const alertRules = await AlertRule.find({ enabled: true });
 
     for (const rule of alertRules) {
       switch (rule.type) {
-        case 'SPEED_ALERT':
+        case 'SPEED_ALERT': {
           if (speedGps > rule.threshold) {
-            const message = `Speed exceeded ${rule.threshold} km/h`;
-            await createAlert(vehicle, 'SPEED_ALERT', message, { speed: speedGps, lat, lon });
-            emitAlertToClients('SPEED_ALERT', message, { speed: speedGps });
-          }
-          break;
-
-        case 'BATTERY_ALERT': {
-          const voltage = Number(extendedData?.vehicleBattery || 0);
-
-          if (voltage >= rule.threshold) {
-            await Alert.updateMany(
-              { vehicleId: vehicle._id, type: 'BATTERY_ALERT', resolved: false },
-              { resolved: true, resolvedAt: new Date() }
-            );
-          } else if (voltage < rule.threshold) {
-            const message = `Battery low: ${voltage}%`;
-            await createAlert(vehicle, 'BATTERY_ALERT', message, { battery: voltage, lat, lon });
-            emitAlertToClients('BATTERY_ALERT', message, { battery: voltage });
+            if (!vehicle.lastSpeedAlerted) {
+              await createAlert(vehicle, 'SPEED_ALERT', `Speed exceeded: ${speedGps} km/h`, { speed: speedGps, lat, lon });
+              vehicle.lastSpeedAlerted = true;
+            }
+          } else if (vehicle.lastSpeedAlerted) {
+            vehicle.lastSpeedAlerted = false;
           }
           break;
         }
 
-        // GEOFENCE alerts will be handled after geofence check
-        case 'GEOFENCE_EXIT':
-        case 'GEOFENCE_ENTRY':
-          // You can implement logic after geofence status below
+        case 'BATTERY_ALERT': {
+          if (battery !== null) {
+            if (battery < rule.threshold) {
+              if (!vehicle.lastBatteryAlerted) {
+                await createAlert(vehicle, 'BATTERY_ALERT', `Battery low: ${battery}%`, { battery, lat, lon });
+                vehicle.lastBatteryAlerted = true;
+              }
+            } else if (vehicle.lastBatteryAlerted) {
+              vehicle.lastBatteryAlerted = false;
+              await Alert.updateMany(
+                { vehicleId: vehicle._id, type: 'BATTERY_ALERT', resolved: false },
+                { resolved: true, resolvedAt: new Date() }
+              );
+            }
+          }
           break;
-
-        default:
-          break;
+        }
       }
     }
 
-    // Track trip
     await handleTripTracking(vehicle, {
       lat,
       lon,
@@ -448,11 +418,10 @@ exports.handleLiveVehicleData = async (data) => {
       extendedData,
     });
 
-    // Geofence check
-    const insideGeofences = await geofenceService.checkVehicleGeofenceStatus(vehicle._id, { lat, lon });
+    await vehicle.save();
 
-    // Emit live position
-    const payload = {
+    const io = socket.getIO();
+    const livePayload = {
       vehicleId: vehicle._id,
       imei: IMEI,
       lat,
@@ -468,8 +437,8 @@ exports.handleLiveVehicleData = async (data) => {
       })),
     };
 
-    io.to(vehicle.user._id.toString()).emit('vehicle_data', payload);
-    io.to('admins').emit('vehicle_data', payload);
+    io.to(vehicle.user._id.toString()).emit('vehicle_data', livePayload);
+    io.to('admins').emit('vehicle_data', livePayload);
   } catch (err) {
     console.error('[TCP] Live Vehicle Data Error:', err.message);
   }

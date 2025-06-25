@@ -52,7 +52,7 @@ const GeofenceSchema = new mongoose.Schema({
   },
   notifyOnEntry: {
     type: Boolean,
-    default: false
+    default: true
   }
 }, {
   timestamps: true
