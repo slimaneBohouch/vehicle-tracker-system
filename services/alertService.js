@@ -1,6 +1,7 @@
-const Alert = require('../models/Alert');
-const geocodingService = require('../services/geocodingService');
-const socket = require('../Utils/socket');
+const Alert = require("../models/Alert");
+const geocodingService = require("../services/geocodingService");
+const socket = require("../Utils/socket");
+const User = require("../models/User");
 
 exports.createAlert = async function (vehicle, type, message, data = {}) {
   try {
@@ -12,30 +13,30 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       try {
         location = await geocodingService.reverseGeocode(lat, lon);
       } catch (err) {
-        console.warn('[Alert] Reverse geocoding failed:', err.message);
+        console.warn("[Alert] Reverse geocoding failed:", err.message);
       }
     }
 
     // ✅ Auto-resolve opposite alert when entering or exiting
     if (data.geofenceId) {
-      if (type === 'GEOFENCE_EXIT') {
+      if (type === "GEOFENCE_EXIT") {
         await Alert.updateMany(
           {
             vehicleId: vehicle._id,
-            type: 'GEOFENCE_ENTRY',
-            'data.geofenceId': data.geofenceId,
+            type: "GEOFENCE_ENTRY",
+            "data.geofenceId": data.geofenceId,
             resolved: false,
           },
           { resolved: true, resolvedAt: new Date() }
         );
       }
 
-      if (type === 'GEOFENCE_ENTRY') {
+      if (type === "GEOFENCE_ENTRY") {
         await Alert.updateMany(
           {
             vehicleId: vehicle._id,
-            type: 'GEOFENCE_EXIT',
-            'data.geofenceId': data.geofenceId,
+            type: "GEOFENCE_EXIT",
+            "data.geofenceId": data.geofenceId,
             resolved: false,
           },
           { resolved: true, resolvedAt: new Date() }
@@ -51,12 +52,14 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
     };
 
     if (data.geofenceId) {
-      query['data.geofenceId'] = data.geofenceId;
+      query["data.geofenceId"] = data.geofenceId;
     }
 
     const existing = await Alert.findOne(query);
     if (existing) {
-      console.log(`[ALERT] Skipped duplicate alert ${type} for geofence ${data.geofenceId}`);
+      console.log(
+        `[ALERT] Skipped duplicate alert ${type} for geofence ${data.geofenceId}`
+      );
       return;
     }
 
@@ -69,6 +72,26 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       location,
     });
 
+try {
+  // Incrémenter pour le user lié au véhicule (si existe)
+  if (vehicle.user && vehicle.user._id) {
+    await User.findByIdAndUpdate(vehicle.user._id, {
+      $inc: { alertCounter: 1 },
+    });
+  } else {
+    console.warn("[ALERT] No user attached to vehicle. Skipping user alert counter increment.");
+  }
+
+  // Incrémenter pour tous les admins et superadmins
+  await User.updateMany(
+    { role: { $in: ["admin", "superadmin"] } },
+    { $inc: { alertCounter: 1 } }
+  );
+} catch (err) {
+  console.error("[ALERT] Failed to increment alert counters:", err.message);
+}
+
+
     console.log(`[ALERT] ${type} created for vehicle ${vehicle.name}`);
 
     const io = socket.getIO();
@@ -79,14 +102,13 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       type,
       message,
       timestamp: alertDoc.timestamp,
-      location: location || 'Unknown location',
+      location: location || "Unknown location",
       data,
     };
 
-    io.to(vehicle.user._id.toString()).emit('alert', alertPayload);
-    io.to('admins').emit('alert', { ...alertPayload, user: vehicle.user });
-
+    io.to(vehicle.user._id.toString()).emit("alert", alertPayload);
+    io.to("admins").emit("alert", { ...alertPayload, user: vehicle.user });
   } catch (err) {
-    console.error('[ALERT] Error creating alert:', err.message);
+    console.error("[ALERT] Error creating alert:", err.message);
   }
 };

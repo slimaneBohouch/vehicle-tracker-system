@@ -51,18 +51,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
   }
 }));
 
-// Middleware JWT
-app.use(async (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) return next();
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id);
-  } catch (err) {
-    console.error('JWT error:', err);
-  }
-  next();
-});
+
 
 app.use(async (req, res, next) => {
   if (req.user) {
@@ -91,13 +80,13 @@ app.use(errorHandler);
 const closeInactiveTrips = require("./jobs/tripCleanup");
 const markInactiveVehicles = require('./jobs/inactiveVehiclesJob');
 
-// Run every 2 minutes
-cron.schedule("*/2 * * * *", async () => {
+// Run every 6 minutes
+cron.schedule("*/6 * * * *", async () => {
   console.log("🔁 Running cron job to close inactive trips...");
   await closeInactiveTrips();
 });
 
-cron.schedule('*/5 * * * *', async () => {
+cron.schedule('*/10 * * * *', async () => {
   console.log('[CRON] Checking for inactive vehicles...');
   await markInactiveVehicles();
 });
