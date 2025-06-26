@@ -5,7 +5,8 @@ const {
   getFleetStatus,
   getTripAnalytics,
   getTopVehicles,
-  getUserStatistics
+  getUserStatistics,
+  getTotalDistanceThisMonth
 } = require('../controllers/statisticsController');
 const { protect } = require('../middleware/auth');
 
@@ -60,5 +61,7 @@ router.get('/top-vehicles', getTopVehicles);
  * @params  ?period=thisMonth
  */
 router.get('/users', getUserStatistics);
+
+router.get('/total-distance-this-month', getTotalDistanceThisMonth);
 
 module.exports = router;

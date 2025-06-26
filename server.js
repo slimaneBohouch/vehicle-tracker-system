@@ -73,7 +73,7 @@ app.use('/api/v1/alert-rules', alertRuleRoutes);
 app.use('/api/v1/immobilizations', immobilizationRoutes);
 app.use('/api/v1/trips', tripRoutes);
 app.use('/api/v1/alerts', alertRoutes);
-app.use('/api/statistics', statisticsRoutes);
+app.use('/api/v1/statistics', statisticsRoutes);
 app.use(errorHandler);
 
 

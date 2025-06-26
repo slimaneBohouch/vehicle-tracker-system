@@ -634,3 +634,51 @@ exports.getUserStatistics = catchAsync(async (req, res, next) => {
     data: formattedStats
   });
 });
+
+
+//---------------
+exports.getTotalDistanceThisMonth = async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userId = req.user._id;
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const endOfMonth = new Date();
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    let vehicleFilter = {};
+
+    if (userRole === "user") {
+      const userVehicles = await Vehicle.find({ user: userId }).select("_id");
+      const vehicleIds = userVehicles.map(v => v._id);
+      vehicleFilter = { vehicle: { $in: vehicleIds } };
+    }
+
+    const total = await Trip.aggregate([
+      {
+        $match: {
+          startTime: { $gte: startOfMonth, $lte: endOfMonth },
+          ...vehicleFilter
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalDistance: { $sum: "$summary.distance" }
+        }
+      }
+    ]);
+
+    res.json({
+      totalDistance: total[0]?.totalDistance || 0
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
+  }
+};
