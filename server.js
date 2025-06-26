@@ -26,7 +26,7 @@ const socket = require('./Utils/socket');
 const immobilizationRoutes = require('./routes/immobilizationRoutes');
 const tripRoutes = require('./routes/tripRoutes');
 const alertRoutes = require('./routes/alertRoutes');
-
+const statisticsRoutes = require('./routes/statisticsRoutes');
 dotenv.config();
 connectDB();
 
@@ -73,7 +73,7 @@ app.use('/api/v1/alert-rules', alertRuleRoutes);
 app.use('/api/v1/immobilizations', immobilizationRoutes);
 app.use('/api/v1/trips', tripRoutes);
 app.use('/api/v1/alerts', alertRoutes);
-
+app.use('/api/statistics', statisticsRoutes);
 app.use(errorHandler);
 
 
