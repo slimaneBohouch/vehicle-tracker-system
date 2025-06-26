@@ -41,9 +41,28 @@ exports.getFleetOverview = catchAsync(async (req, res, next) => {
   const { period = 'thisMonth' } = req.query;
   const user = req.user;
 
-  // Always use this year
-  const startDate = moment().startOf('year').toDate();
-  const endDate = moment().endOf('year').toDate();
+let startDate, endDate;
+
+switch (period) {
+  case 'today':
+    startDate = moment().startOf('day').toDate();
+    endDate = moment().endOf('day').toDate();
+    break;
+  case 'thisWeek':
+    startDate = moment().startOf('week').toDate();
+    endDate = moment().endOf('week').toDate();
+    break;
+  case 'thisMonth':
+    startDate = moment().startOf('month').toDate();
+    endDate = moment().endOf('month').toDate();
+    break;
+  case 'thisYear':
+  default:
+    startDate = moment().startOf('year').toDate();
+    endDate = moment().endOf('year').toDate();
+    break;
+}
+
 
   // Get accessible vehicles
   const accessibleVehicles = await getUserAccessibleVehicles(user);

@@ -210,3 +210,44 @@
 [26/06/2025 18:13:24] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
 [26/06/2025 18:13:29] [TCP] 🔌 Trying to connect to server...
 [26/06/2025 18:13:29] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 18:14:53] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 18:14:54] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 18:27:17] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 18:27:17] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 18:36:56] [TCP] ❌ Socket Error: read ECONNRESET
+[26/06/2025 18:36:56] [TCP] ❌ Connection closed due to error
+[26/06/2025 18:36:56] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[26/06/2025 18:36:56] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[26/06/2025 18:37:01] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 18:37:02] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 18:40:30] [TCP] ❌ Socket Error: read ECONNRESET
+[26/06/2025 18:40:30] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[26/06/2025 18:40:30] [TCP] ❌ Connection closed due to error
+[26/06/2025 18:40:30] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[26/06/2025 18:40:35] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 18:40:36] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 18:46:31] [TCP] ❌ Socket Error: read ECONNRESET
+[26/06/2025 18:46:31] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[26/06/2025 18:46:31] [TCP] ❌ Connection closed due to error
+[26/06/2025 18:46:31] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[26/06/2025 18:46:36] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 18:46:36] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 20:20:30] [TCP] ❌ Connection closed due to error
+[26/06/2025 20:20:30] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[26/06/2025 20:20:30] [TCP] ❌ Socket Error: read ECONNRESET
+[26/06/2025 20:20:30] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[26/06/2025 20:20:35] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 20:20:35] [TCP] ❌ Socket Error: getaddrinfo ENOTFOUND pogog.ovh
+[26/06/2025 20:20:35] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 3/10)
+[26/06/2025 20:20:35] [TCP] ❌ Connection closed due to error
+[26/06/2025 20:20:35] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 4/10)
+[26/06/2025 20:20:40] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 20:20:41] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 20:23:34] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 20:23:35] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 20:32:10] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 20:32:10] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 20:52:25] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 20:52:25] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[26/06/2025 21:05:36] [TCP] 🔌 Trying to connect to server...
+[26/06/2025 21:05:37] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
