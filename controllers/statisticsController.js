@@ -682,6 +682,7 @@ exports.getTotalDistanceThisMonth = async (req, res) => {
       {
         $match: {
           startTime: { $gte: startOfMonth, $lte: endOfMonth },
+          status: "completed",
           ...vehicleFilter
         }
       },
