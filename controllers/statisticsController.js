@@ -349,6 +349,10 @@ exports.getTripAnalytics = catchAsync(async (req, res, next) => {
   // Get date range
   let startDate, endDate;
   switch (period) {
+    case 'today':
+      startDate = moment().startOf('day').toDate();
+      endDate = moment().endOf('day').toDate();
+      break;
     case 'thisWeek':
       startDate = moment().startOf('week').toDate();
       endDate = moment().endOf('week').toDate();
@@ -373,7 +377,7 @@ exports.getTripAnalytics = catchAsync(async (req, res, next) => {
       status: 'success',
       data: []
     });
-  }
+  }   
 
   // Define grouping format
   let groupFormat;
@@ -407,7 +411,8 @@ exports.getTripAnalytics = catchAsync(async (req, res, next) => {
         _id: {
           $dateToString: {
             format: groupFormat,
-            date: '$startTime'
+            date: '$startTime',
+            timezone: 'Africa/Casablanca'
           }
         },
         tripCount: { $sum: 1 },
