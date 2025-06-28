@@ -22,7 +22,6 @@ exports.protect = asyncHandler(async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const user = await User.findById(decoded.id);
 
     if (!user) {
@@ -34,13 +33,21 @@ exports.protect = asyncHandler(async (req, res, next) => {
       return next(new ErrorResponse('Your account has been deactivated', 401));
     }
 
+    // ✅ Update lastActive only if more than 5 minutes passed
+    const now = new Date();
+    const diffMs = now - new Date(user.lastActive || 0);
+
+    if (diffMs > 1000 * 60 * 5) {
+      user.lastActive = now;
+      await user.save();
+    }
+
     req.user = user;
     next();
   } catch (err) {
     return next(new ErrorResponse('Not authorized to access this route', 401));
   }
 });
-
 
 // Grant access to specific roles
 exports.authorize = (...roles) => {

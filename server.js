@@ -52,18 +52,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
 }));
 
 
-
-app.use(async (req, res, next) => {
-  if (req.user) {
-    const now = new Date();
-    const diffMs = now - new Date(req.user.lastActive || 0);
-    if (diffMs > 1000 * 60 * 5) {
-      await User.findByIdAndUpdate(req.user._id, { lastActive: now });
-    }
-  }
-  next();
-});
-
 // Routes
 app.use('/api/v1/auth', auth);
 app.use('/api/v1/vehicles', vehicleRoutes);
