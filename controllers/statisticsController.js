@@ -707,3 +707,97 @@ exports.getTotalDistanceThisMonth = async (req, res) => {
     res.status(500).json({ error: "Server Error" });
   }
 };
+
+/**
+ * Get Heatmap Data (places with most trip starts/ends)
+ * GET /api/statistics/places-heatmap
+ */
+exports.getPlacesHeatmap = catchAsync(async (req, res, next) => {
+  const { period = 'thisMonth' } = req.query;
+  const user = req.user;
+
+  // Get date range
+  let startDate, endDate;
+  switch (period) {
+    case 'today':
+      startDate = moment().startOf('day').toDate();
+      endDate = moment().endOf('day').toDate();
+      break;
+    case 'thisWeek':
+      startDate = moment().startOf('week').toDate();
+      endDate = moment().endOf('week').toDate();
+      break;
+    case 'thisMonth':
+      startDate = moment().startOf('month').toDate();
+      endDate = moment().endOf('month').toDate();
+      break;
+    case 'thisYear':
+      startDate = moment().startOf('year').toDate();
+      endDate = moment().endOf('year').toDate();
+      break;
+    default:
+      startDate = moment().startOf('month').toDate();
+      endDate = moment().endOf('month').toDate();
+  }
+
+  // Filter vehicles based on role
+  const accessibleVehicles = await getUserAccessibleVehicles(user);
+  const vehicleIds = accessibleVehicles.map(v => v._id);
+
+  if (vehicleIds.length === 0) {
+    return res.status(200).json({
+      status: 'success',
+      data: []
+    });
+  }
+
+  // Aggregate trips and count unique location points (start and end locations)
+  const heatmapData = await Trip.aggregate([
+    {
+      $match: {
+        vehicle: { $in: vehicleIds },
+        startTime: { $gte: startDate, $lte: endDate },
+        status: 'completed'
+      }
+    },
+    {
+      $project: {
+        locations: [
+          {
+            type: '$startLocation.type',
+            coordinates: '$startLocation.coordinates'
+          },
+          {
+            type: '$endLocation.type',
+            coordinates: '$endLocation.coordinates'
+          }
+        ]
+      }
+    },
+    { $unwind: '$locations' },
+    { $match: { 'locations.coordinates': { $ne: null } } },
+    {
+      $group: {
+        _id: {
+          lat: { $round: [{ $arrayElemAt: ['$locations.coordinates', 1] }, 4] },
+          lon: { $round: [{ $arrayElemAt: ['$locations.coordinates', 0] }, 4] }
+        },
+        visitCount: { $sum: 1 }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        lat: '$_id.lat',
+        lon: '$_id.lon',
+        visitCount: 1
+      }
+    },
+    { $sort: { visitCount: -1 } }
+  ]);
+
+  res.status(200).json({
+    status: 'success',
+    data: heatmapData
+  });
+});
