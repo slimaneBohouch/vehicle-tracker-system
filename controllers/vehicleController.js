@@ -183,25 +183,27 @@ const geocodingService = require('../services/geocodingService');
    * Get a specific vehicle by ID
    * GET /api/vehicles/:id
    */
-  exports.getVehicle = catchAsync(async (req, res, next) => {
-    const vehicle = await Vehicle.findById(req.params.id);
+exports.getVehicle = catchAsync(async (req, res, next) => {
+  const vehicle = await Vehicle.findById(req.params.id);
 
-    if (!vehicle) {
-      return next(new AppError('No vehicle found with that ID', 404));
-    }
+  if (!vehicle) {
+    return next(new AppError('No vehicle found with that ID', 404));
+  }
 
-    // Check if the vehicle belongs to the current user
+  if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
     if (vehicle.user.toString() !== req.user.id) {
       return next(new AppError('You do not have permission to access this vehicle', 403));
     }
+  }
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        vehicle
-      }
-    });
+  res.status(200).json({
+    status: 'success',
+    data: {
+      vehicle
+    }
   });
+});
+
 
   /**
    * Update vehicle details
