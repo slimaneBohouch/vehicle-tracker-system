@@ -124,3 +124,39 @@ exports.resetAlertCounter = async (req, res) => {
     res.status(500).json({ error: 'Failed to reset alert counter' });
   }
 };
+
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const currentUser = req.user; // Authenticated user making the request
+    const targetUser = await User.findById(req.params.id);
+
+    // Check if target user exists
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent deleting yourself
+    if (targetUser.id === currentUser.id) {
+      return res.status(403).json({ success: false, message: 'You cannot delete your own account.' });
+    }
+
+    // Only superadmin can delete users
+    if (currentUser.role !== 'superadmin') {
+      return res.status(403).json({ success: false, message: 'Only superadmin can delete users.' });
+    }
+
+    // Prevent deleting another superadmin
+    if (targetUser.role === 'superadmin') {
+      return res.status(403).json({ success: false, message: 'Superadmin cannot delete another superadmin.' });
+    }
+
+    // Perform deletion
+    await targetUser.deleteOne();
+
+    res.status(200).json({ success: true, message: 'User deleted successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+

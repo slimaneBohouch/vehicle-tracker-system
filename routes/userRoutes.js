@@ -6,14 +6,15 @@ const {
   updateUserRole,
   getUserById,
   getUserVehicleStats,
-  resetAlertCounter
-
+  resetAlertCounter,
+  deleteUser
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 
 // Get users
 router.get('/', protect, authorize('admin', 'superadmin'), getAllUsers);
 router.post('/reset-alert-counter', protect, resetAlertCounter);
+router.delete('/delete-user/:id', protect, deleteUser);
 // Update status (admin can only affect users, superadmin affects all)
 router.patch('/:id/status', protect, authorize('admin', 'superadmin'), updateUserStatus);
 
