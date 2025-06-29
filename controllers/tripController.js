@@ -12,10 +12,13 @@ function haversineDistance(coord1, coord2) {
   const lat1 = toRad(coord1[1]);
   const lat2 = toRad(coord2[1]);
 
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+
+  return R * c; // in km
 }
 
 exports.handleTripTracking = async (vehicle, data) => {
@@ -28,7 +31,7 @@ exports.handleTripTracking = async (vehicle, data) => {
 
   let trip = await Trip.findOne({ vehicle: vehicle._id, status: 'active' });
 
-  // 🛑 End the trip if ignition is off
+  // ✅ End Trip
   if (isIgnitionOff && trip) {
     const lastPosition = await Position.findOne({ trip: trip._id }).sort({ createdAt: -1 });
 
@@ -39,7 +42,6 @@ exports.handleTripTracking = async (vehicle, data) => {
       trip.summary.distance += distance;
     }
 
-    trip.status = 'completed';
     trip.endTime = timestamp;
     trip.endLocation = {
       type: 'Point',
@@ -48,18 +50,34 @@ exports.handleTripTracking = async (vehicle, data) => {
       speed: speedGps
     };
 
+    // ✅ Distance totale du Trip selon l'odometer embarqué
+    trip.summary.distanceFromOdometer = (extendedData?.tripOdometer || 0) / 1000; // Convert meters → km
+
     const durationMs = trip.endTime - trip.startTime;
     const durationMin = durationMs / 60000;
     trip.summary.duration = durationMin;
-    trip.summary.averageSpeed = durationMin > 0 ? (trip.summary.distance / (durationMin / 60)) : 0;
+
+    if (trip.summary.distanceFromOdometer == 0) {
+    trip.summary.averageSpeed =
+      durationMin > 0
+        ? trip.summary.distance / (durationMin / 60)
+        : 0;
+    }else {
+      trip.summary.averageSpeed =
+        durationMin > 0
+          ? trip.summary.distanceFromOdometer / (durationMin / 60)
+          : 0;
+    }
+
+    trip.status = 'completed';
 
     await trip.save();
 
-    console.log(`[Trip Ended] ${vehicle.name} | Distance: ${trip.summary.distance.toFixed(2)} km | Duration: ${durationMin.toFixed(1)} min`);
+    console.log(`[Trip Ended] ${vehicle.name} | TripOdometer Distance: ${(trip.summary.distanceFromOdometer).toFixed(2)} km | Duration: ${durationMin.toFixed(1)} min`);
     return;
   }
 
-  // 🆕 Start a new trip if ignition on + moving
+  // ✅ Start Trip
   if (!trip && isMoving) {
     trip = await Trip.create({
       vehicle: vehicle._id,
@@ -73,6 +91,7 @@ exports.handleTripTracking = async (vehicle, data) => {
       },
       summary: {
         distance: 0,
+        distanceFromOdometer: 0,
         duration: 0,
         averageSpeed: 0,
         maxSpeed: speedGps,
@@ -80,74 +99,76 @@ exports.handleTripTracking = async (vehicle, data) => {
       },
       status: 'active'
     });
+
     console.log(`[Trip Started] ${vehicle.name} at ${timestamp.toISOString()}`);
   }
 
-  // ⏱ Avoid saving too frequently
+  // ✅ Save Position (interval check)
   if (trip) {
-  const lastPosition = await Position.findOne({ trip: trip._id }).sort({ createdAt: -1 });
+    const lastPosition = await Position.findOne({ trip: trip._id }).sort({ createdAt: -1 });
 
-  if (lastPosition && timestamp - lastPosition.createdAt < POSITION_INTERVAL) return;
+    if (lastPosition && timestamp - lastPosition.createdAt < POSITION_INTERVAL) return;
 
-  // ✅ Enregistrer la nouvelle position
-  await Position.create({
-    vehicle: vehicle._id,
-    trip: trip._id,
-    location: {
-      type: 'Point',
-      coordinates: [lon, lat]
-    },
-    speed: speedGps,
-    deviceStatus: {
-      ignition,
-      battery: extendedData?.vehicleBattery || 0
-    },
-    createdAt: timestamp
-  });
+    await Position.create({
+      vehicle: vehicle._id,
+      trip: trip._id,
+      location: {
+        type: 'Point',
+        coordinates: [lon, lat]
+      },
+      speed: speedGps,
+      deviceStatus: {
+        ignition,
+        battery: extendedData?.vehicleBattery || 0
+      },
+      createdAt: timestamp
+    });
 
-  // ✅ Mettre à jour le résumé du trip
-  trip.summary.positionsCount += 1;
+    trip.summary.positionsCount += 1;
 
-  // ✅ Calcul correct de la vitesse max
-  const currentValidSpeed = speedGps && speedGps > 0 ? speedGps : 0;
-  if (currentValidSpeed > trip.summary.maxSpeed) {
-    trip.summary.maxSpeed = currentValidSpeed;
+    const validSpeed = speedGps > 0 ? speedGps : 0;
+    if (validSpeed > trip.summary.maxSpeed) {
+      trip.summary.maxSpeed = validSpeed;
+    }
+
+    if (lastPosition) {
+      const lastCoord = lastPosition.location.coordinates;
+      const currentCoord = [lon, lat];
+      const distance = haversineDistance(currentCoord, lastCoord);
+      trip.summary.distance += distance;
+    }
+
+    trip.updatedAt = new Date();
+    await trip.save();
   }
-
-  if (lastPosition) {
-    const lastCoord = lastPosition.location.coordinates;
-    const currentCoord = [lon, lat];
-    const distance = haversineDistance(currentCoord, lastCoord);
-    trip.summary.distance += distance;
-  }
-
-  trip.updatedAt = new Date();
-  await trip.save();
-}
-
 };
 
-
+// ✅ Get Trips By Date
 exports.getTripsByDate = async (req, res) => {
   const { vehicleId, startDate, endDate } = req.query;
+
   const filter = {
     startTime: { $gte: new Date(startDate), $lte: new Date(endDate) }
   };
   if (vehicleId) filter.vehicle = vehicleId;
 
   const trips = await Trip.find(filter).populate('vehicle').lean();
+
   res.status(200).json(trips);
 };
 
+// ✅ Get Positions By Trip
 exports.getPositionsByTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
+
     const positions = await Position.find({ trip: tripId })
       .sort({ createdAt: 1 })
       .select('location createdAt speed');
 
     res.status(200).json(positions);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Failed to fetch positions' });
   }
 };
