@@ -73,7 +73,10 @@ exports.handleTripTracking = async (vehicle, data) => {
 
     await trip.save();
 
-    console.log(`[Trip Ended] ${vehicle.name} | TripOdometer Distance: ${(trip.summary.distanceFromOdometer).toFixed(2)} km | Duration: ${durationMin.toFixed(1)} min`);
+console.log(
+  `[Trip Ended] ${vehicle.name} | TripOdometer Distance: ${(trip.summary.distanceFromOdometer).toFixed(2)} km | Haversine Distance: ${trip.summary.distance.toFixed(2)} km | Duration: ${durationMin.toFixed(1)} min`.magenta
+);
+
     return;
   }
 
