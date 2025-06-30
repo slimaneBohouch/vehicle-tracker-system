@@ -72,24 +72,16 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       location,
     });
 
-try {
-  // Incrémenter pour le user du véhicule
-  await User.findByIdAndUpdate(vehicle.user._id, {
-    $inc: { alertCounter: 1 },
-  });
-
-  // Incrémenter pour les autres admins/superadmins sauf ce user
-  await User.updateMany(
-    { role: { $in: ["admin", "superadmin"] }, _id: { $ne: vehicle.user._id } },
-    { $inc: { alertCounter: 1 } }
-  );
-} catch (err) {
-  console.error("[ALERT] Failed to increment alert counters:", err.message);
-}
-
-
-
-    console.log(`[ALERT] ${type} created for vehicle ${vehicle.name}`);
+// Increment counters
+    try {
+      await User.findByIdAndUpdate(vehicle.user._id, { $inc: { alertCounter: 1 } });
+      await User.updateMany(
+        { role: { $in: ["admin", "superadmin"] }, _id: { $ne: vehicle.user._id } },
+        { $inc: { alertCounter: 1 } }
+      );
+    } catch (err) {
+      console.error("[ALERT] Failed to increment counters:", err.message);
+    }
 
     const io = socket.getIO();
     const alertPayload = {
@@ -101,10 +93,15 @@ try {
       timestamp: alertDoc.timestamp,
       location: location || "Unknown location",
       data,
+      userId: vehicle.user._id.toString(),
     };
 
+    // ✅ Send alert to vehicle owner
     io.to(vehicle.user._id.toString()).emit("alert", alertPayload);
-    io.to("admins").emit("alert", { ...alertPayload, user: vehicle.user });
+
+    // ✅ Send to admins, include excludeUserId for frontend filtering
+    io.to("admins").emit("alert", { ...alertPayload, excludeUserId: vehicle.user._id.toString() });
+
   } catch (err) {
     console.error("[ALERT] Error creating alert:", err.message);
   }
