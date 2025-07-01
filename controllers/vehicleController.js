@@ -339,7 +339,7 @@ exports.getVehicle = catchAsync(async (req, res, next) => {
 exports.handleLiveVehicleData = async (data) => {
   try {
     const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
-    if (!IMEI || !lat || !lon) return console.warn("Invalid GPS data", data);
+    if (!IMEI || lat === undefined || lon === undefined) return console.warn("Invalid GPS data", data);
 
     const vehicle = await Vehicle.findOne({ imei: IMEI }).populate('user');
     if (!vehicle) return console.warn(`Vehicle not found: ${IMEI}`);
@@ -363,12 +363,37 @@ exports.handleLiveVehicleData = async (data) => {
         : 'inactive';
     }
 
+    // Calculate heading BEFORE overwriting lastPosition
+    let heading = null;
+    const prev = vehicle.lastPosition;
+    if (
+      prev &&
+      prev.lat !== undefined &&
+      prev.lon !== undefined &&
+      prev.lat !== 0 &&
+      prev.lon !== 0 &&
+      lat !== 0 &&
+      lon !== 0
+    ) {
+      const toRad = (deg) => deg * (Math.PI / 180);
+      const toDeg = (rad) => rad * (180 / Math.PI);
+
+      const dLon = toRad(lon - prev.lon);
+      const y = Math.sin(dLon) * Math.cos(toRad(lat));
+      const x =
+        Math.cos(toRad(prev.lat)) * Math.sin(toRad(lat)) -
+        Math.sin(toRad(prev.lat)) * Math.cos(toRad(lat)) * Math.cos(dLon);
+      const brng = Math.atan2(y, x);
+      heading = (toDeg(brng) + 360) % 360;
+    }
+
     vehicle.lastPosition = {
       lat,
       lon,
       speed: speedGps || 0,
       timestamp,
       ignition: isIgnitionOn,
+      heading,
     };
 
     vehicle.extendedData = extendedData;
@@ -431,6 +456,7 @@ exports.handleLiveVehicleData = async (data) => {
       speed: speedGps,
       ignition: isIgnitionOn,
       timestamp,
+      heading,
       extendedData,
       insideGeofences: insideGeofences.map((g) => ({
         id: g._id,
@@ -445,5 +471,6 @@ exports.handleLiveVehicleData = async (data) => {
     console.error('[TCP] Live Vehicle Data Error:', err.message);
   }
 };
+
 
 

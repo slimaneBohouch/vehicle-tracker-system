@@ -40,7 +40,8 @@ const vehicleSchema = new mongoose.Schema({
     timestamp: Date,
     satellites: Number,
     ignition: Boolean,
-    movement: Boolean
+    movement: Boolean,
+    heading: Number,
   },
   extendedData: {
     vehicleBattery: Number,
