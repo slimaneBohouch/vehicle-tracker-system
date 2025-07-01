@@ -2,6 +2,8 @@ const Alert = require("../models/Alert");
 const geocodingService = require("../services/geocodingService");
 const socket = require("../Utils/socket");
 const User = require("../models/User");
+const colors = require('colors');
+
 
 exports.createAlert = async function (vehicle, type, message, data = {}) {
   try {
@@ -82,7 +84,8 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       console.error("[ALERT] Failed to increment alert counters:", err.message);
     }
 
-    console.log(`[ALERT] ${type} created for vehicle ${vehicle.name}`);
+   console.log(`${colors.red('[ALERT]')} ${type} created for vehicle ${vehicle.name} on ${new Date().toLocaleString()}`);
+
 
     // Emit alert to all relevant users without duplication
     const io = socket.getIO();
