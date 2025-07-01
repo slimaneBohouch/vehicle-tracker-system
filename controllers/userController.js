@@ -98,7 +98,7 @@ exports.getUserVehicles = async (req, res, next) => {
   try {
     const userId = req.params.id;
 
-    const vehicles = await Vehicle.find({ user: userId }).select('name plate imei');
+    const vehicles = await Vehicle.find({ user: userId }).select('name licensePlate currentStatus imei');
 
     res.status(200).json({
       success: true,
@@ -173,5 +173,19 @@ exports.deleteUser = async (req, res, next) => {
     next(error);
   }
 };
+exports.getAllUsersExceptSuperadmins = async (req, res, next) => {
+  try {
+    const users = await User.find({ role: { $ne: 'superadmin' } })
+      .select('name email role');
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 
