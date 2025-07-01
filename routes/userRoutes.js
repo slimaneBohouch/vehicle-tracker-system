@@ -7,7 +7,8 @@ const {
   getUserById,
   getUserVehicleStats,
   resetAlertCounter,
-  deleteUser
+  deleteUser,
+  getUserVehicles
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -22,6 +23,8 @@ router.patch('/:id/status', protect, authorize('admin', 'superadmin'), updateUse
 router.patch('/:id/role', protect, authorize('superadmin'), updateUserRole);
 router.get('/:id', protect, authorize('admin', 'superadmin'), getUserById);
 router.get('/:id/stats', protect, authorize('admin', 'superadmin'), getUserVehicleStats);
+router.get('/:id/vehicles', protect, getUserVehicles);
+
 
 
 module.exports = router;

@@ -94,6 +94,21 @@ exports.getUserById = async (req, res, next) => {
   }
 };
 
+exports.getUserVehicles = async (req, res, next) => {
+  try {
+    const userId = req.params.id;
+
+    const vehicles = await Vehicle.find({ user: userId }).select('name plate imei');
+
+    res.status(200).json({
+      success: true,
+      data: vehicles,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.getUserVehicleStats = async (req, res, next) => {
   try {
     const userId = req.params.id;
