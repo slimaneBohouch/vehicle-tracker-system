@@ -171,22 +171,31 @@ exports.getVehicleStatistics = catchAsync(async (req, res, next) => {
   const user = req.user;
   
   // Get date range
-  let startDate, endDate;
-  switch (period) {
-    case 'today':
-      startDate = moment().startOf('day').toDate();
-      endDate = moment().endOf('day').toDate();
-      break;
-    case 'thisWeek':
-      startDate = moment().startOf('week').toDate();
-      endDate = moment().endOf('week').toDate();
-      break;
-    case 'thisMonth':
-    default:
-      startDate = moment().startOf('month').toDate();
-      endDate = moment().endOf('month').toDate();
-      break;
-  }
+let startDate, endDate;
+switch (period) {
+  case 'today':
+    startDate = moment().startOf('day').toDate();
+    endDate = moment().endOf('day').toDate();
+    break;
+  case 'thisWeek':
+    startDate = moment().startOf('week').toDate();
+    endDate = moment().endOf('week').toDate();
+    break;
+  case 'thisMonth':
+    startDate = moment().startOf('month').toDate();
+    endDate = moment().endOf('month').toDate();
+    break;
+  case 'thisYear':
+    startDate = moment().startOf('year').toDate();
+    endDate = moment().endOf('year').toDate();
+    break;
+  default:
+    // Fallback : Par sécurité, met la période du mois
+    startDate = moment().startOf('month').toDate();
+    endDate = moment().endOf('month').toDate();
+    break;
+}
+
 
   // Get accessible vehicles
   let vehicleFilter = getBaseVehicleFilter(user);
