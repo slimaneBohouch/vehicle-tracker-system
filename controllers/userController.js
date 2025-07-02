@@ -94,6 +94,21 @@ exports.getUserById = async (req, res, next) => {
   }
 };
 
+exports.getUserVehicles = async (req, res, next) => {
+  try {
+    const userId = req.params.id;
+
+    const vehicles = await Vehicle.find({ user: userId }).select('name licensePlate currentStatus imei');
+
+    res.status(200).json({
+      success: true,
+      data: vehicles,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.getUserVehicleStats = async (req, res, next) => {
   try {
     const userId = req.params.id;
@@ -124,3 +139,53 @@ exports.resetAlertCounter = async (req, res) => {
     res.status(500).json({ error: 'Failed to reset alert counter' });
   }
 };
+
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const currentUser = req.user; // Authenticated user making the request
+    const targetUser = await User.findById(req.params.id);
+
+    // Check if target user exists
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent deleting yourself
+    if (targetUser.id === currentUser.id) {
+      return res.status(403).json({ success: false, message: 'You cannot delete your own account.' });
+    }
+
+    // Only superadmin can delete users
+    if (currentUser.role !== 'superadmin') {
+      return res.status(403).json({ success: false, message: 'Only superadmin can delete users.' });
+    }
+
+    // Prevent deleting another superadmin
+    if (targetUser.role === 'superadmin') {
+      return res.status(403).json({ success: false, message: 'Superadmin cannot delete another superadmin.' });
+    }
+
+    // Perform deletion
+    await targetUser.deleteOne();
+
+    res.status(200).json({ success: true, message: 'User deleted successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+exports.getAllUsersExceptSuperadmins = async (req, res, next) => {
+  try {
+    const users = await User.find({ role: { $ne: 'superadmin' } })
+      .select('name email role');
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+

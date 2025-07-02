@@ -41,9 +41,28 @@ exports.getFleetOverview = catchAsync(async (req, res, next) => {
   const { period = 'thisMonth' } = req.query;
   const user = req.user;
 
-  // Always use this year
-  const startDate = moment().startOf('year').toDate();
-  const endDate = moment().endOf('year').toDate();
+let startDate, endDate;
+
+switch (period) {
+  case 'today':
+    startDate = moment().startOf('day').toDate();
+    endDate = moment().endOf('day').toDate();
+    break;
+  case 'thisWeek':
+    startDate = moment().startOf('week').toDate();
+    endDate = moment().endOf('week').toDate();
+    break;
+  case 'thisMonth':
+    startDate = moment().startOf('month').toDate();
+    endDate = moment().endOf('month').toDate();
+    break;
+  case 'thisYear':
+  default:
+    startDate = moment().startOf('year').toDate();
+    endDate = moment().endOf('year').toDate();
+    break;
+}
+
 
   // Get accessible vehicles
   const accessibleVehicles = await getUserAccessibleVehicles(user);
@@ -152,22 +171,31 @@ exports.getVehicleStatistics = catchAsync(async (req, res, next) => {
   const user = req.user;
   
   // Get date range
-  let startDate, endDate;
-  switch (period) {
-    case 'today':
-      startDate = moment().startOf('day').toDate();
-      endDate = moment().endOf('day').toDate();
-      break;
-    case 'thisWeek':
-      startDate = moment().startOf('week').toDate();
-      endDate = moment().endOf('week').toDate();
-      break;
-    case 'thisMonth':
-    default:
-      startDate = moment().startOf('month').toDate();
-      endDate = moment().endOf('month').toDate();
-      break;
-  }
+let startDate, endDate;
+switch (period) {
+  case 'today':
+    startDate = moment().startOf('day').toDate();
+    endDate = moment().endOf('day').toDate();
+    break;
+  case 'thisWeek':
+    startDate = moment().startOf('week').toDate();
+    endDate = moment().endOf('week').toDate();
+    break;
+  case 'thisMonth':
+    startDate = moment().startOf('month').toDate();
+    endDate = moment().endOf('month').toDate();
+    break;
+  case 'thisYear':
+    startDate = moment().startOf('year').toDate();
+    endDate = moment().endOf('year').toDate();
+    break;
+  default:
+    // Fallback : Par sécurité, met la période du mois
+    startDate = moment().startOf('month').toDate();
+    endDate = moment().endOf('month').toDate();
+    break;
+}
+
 
   // Get accessible vehicles
   let vehicleFilter = getBaseVehicleFilter(user);
@@ -330,6 +358,10 @@ exports.getTripAnalytics = catchAsync(async (req, res, next) => {
   // Get date range
   let startDate, endDate;
   switch (period) {
+    case 'today':
+      startDate = moment().startOf('day').toDate();
+      endDate = moment().endOf('day').toDate();
+      break;
     case 'thisWeek':
       startDate = moment().startOf('week').toDate();
       endDate = moment().endOf('week').toDate();
@@ -354,7 +386,7 @@ exports.getTripAnalytics = catchAsync(async (req, res, next) => {
       status: 'success',
       data: []
     });
-  }
+  }   
 
   // Define grouping format
   let groupFormat;
@@ -388,7 +420,8 @@ exports.getTripAnalytics = catchAsync(async (req, res, next) => {
         _id: {
           $dateToString: {
             format: groupFormat,
-            date: '$startTime'
+            date: '$startTime',
+            timezone: 'Africa/Casablanca'
           }
         },
         tripCount: { $sum: 1 },
@@ -632,5 +665,148 @@ exports.getUserStatistics = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     data: formattedStats
+  });
+});
+
+
+//---------------
+exports.getTotalDistanceThisMonth = async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userId = req.user._id;
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const endOfMonth = new Date();
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    let vehicleFilter = {};
+
+    if (userRole === "user") {
+      const userVehicles = await Vehicle.find({ user: userId }).select("_id");
+      const vehicleIds = userVehicles.map(v => v._id);
+      vehicleFilter = { vehicle: { $in: vehicleIds } };
+    }
+
+    const total = await Trip.aggregate([
+      {
+        $match: {
+          startTime: { $gte: startOfMonth, $lte: endOfMonth },
+          status: "completed",
+          ...vehicleFilter
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalDistance: { $sum: "$summary.distance" }
+        }
+      }
+    ]);
+
+    res.json({
+      totalDistance: total[0]?.totalDistance || 0
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
+  }
+};
+
+/**
+ * Get Heatmap Data (places with most trip starts/ends)
+ * GET /api/statistics/places-heatmap
+ */
+exports.getPlacesHeatmap = catchAsync(async (req, res, next) => {
+  const { period = 'thisMonth' } = req.query;
+  const user = req.user;
+
+  // Get date range
+  let startDate, endDate;
+  switch (period) {
+    case 'today':
+      startDate = moment().startOf('day').toDate();
+      endDate = moment().endOf('day').toDate();
+      break;
+    case 'thisWeek':
+      startDate = moment().startOf('week').toDate();
+      endDate = moment().endOf('week').toDate();
+      break;
+    case 'thisMonth':
+      startDate = moment().startOf('month').toDate();
+      endDate = moment().endOf('month').toDate();
+      break;
+    case 'thisYear':
+      startDate = moment().startOf('year').toDate();
+      endDate = moment().endOf('year').toDate();
+      break;
+    default:
+      startDate = moment().startOf('month').toDate();
+      endDate = moment().endOf('month').toDate();
+  }
+
+  // Filter vehicles based on role
+  const accessibleVehicles = await getUserAccessibleVehicles(user);
+  const vehicleIds = accessibleVehicles.map(v => v._id);
+
+  if (vehicleIds.length === 0) {
+    return res.status(200).json({
+      status: 'success',
+      data: []
+    });
+  }
+
+  // Aggregate trips and count unique location points (start and end locations)
+  const heatmapData = await Trip.aggregate([
+    {
+      $match: {
+        vehicle: { $in: vehicleIds },
+        startTime: { $gte: startDate, $lte: endDate },
+        status: 'completed'
+      }
+    },
+    {
+      $project: {
+        locations: [
+          {
+            type: '$startLocation.type',
+            coordinates: '$startLocation.coordinates'
+          },
+          {
+            type: '$endLocation.type',
+            coordinates: '$endLocation.coordinates'
+          }
+        ]
+      }
+    },
+    { $unwind: '$locations' },
+    { $match: { 'locations.coordinates': { $ne: null } } },
+    {
+      $group: {
+        _id: {
+          lat: { $round: [{ $arrayElemAt: ['$locations.coordinates', 1] }, 4] },
+          lon: { $round: [{ $arrayElemAt: ['$locations.coordinates', 0] }, 4] }
+        },
+        visitCount: { $sum: 1 }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        lat: '$_id.lat',
+        lon: '$_id.lon',
+        visitCount: 1
+      }
+    },
+    { $sort: { visitCount: -1 } }
+  ]);
+
+  res.status(200).json({
+    status: 'success',
+    data: heatmapData
   });
 });

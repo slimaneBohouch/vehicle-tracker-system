@@ -62,14 +62,17 @@ exports.login = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/auth/logout
 // @access  Private
 exports.logout = asyncHandler(async (req, res, next) => {
-  res.cookie('token', 'none', {
-    expires: new Date(Date.now() + 10 * 1000),
-    httpOnly: true
+  res.cookie('token', '', {
+    httpOnly: true,
+    expires: new Date(0),                // ✅ Expire immédiatement
+    sameSite: 'Lax',                     // ✅ Protection CSRF
+    secure: process.env.NODE_ENV === 'production',  // ✅ Pour HTTPS en prod
   });
 
   res.status(200).json({
     success: true,
-    data: {}
+    data: {},
+    message: "Logout successful",
   });
 });
 

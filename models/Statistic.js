@@ -49,10 +49,6 @@ const statisticSchema = new mongoose.Schema({
       type: Number, // in minutes
       default: 0
     },
-    fuelConsumption: {
-      type: Number, // estimated in liters, if available from device
-      default: 0
-    },
     movementHours: [
       {
         hour: Number, // 0-23
@@ -72,7 +68,6 @@ const statisticSchema = new mongoose.Schema({
         geofenceEntry: Number,
         speedExceeded: Number,
         unauthorizedMovement: Number,
-        immobilization: Number,
         lowBattery: Number
       }
     }

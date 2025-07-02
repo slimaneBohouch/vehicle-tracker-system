@@ -183,25 +183,27 @@ const geocodingService = require('../services/geocodingService');
    * Get a specific vehicle by ID
    * GET /api/vehicles/:id
    */
-  exports.getVehicle = catchAsync(async (req, res, next) => {
-    const vehicle = await Vehicle.findById(req.params.id);
+exports.getVehicle = catchAsync(async (req, res, next) => {
+  const vehicle = await Vehicle.findById(req.params.id);
 
-    if (!vehicle) {
-      return next(new AppError('No vehicle found with that ID', 404));
-    }
+  if (!vehicle) {
+    return next(new AppError('No vehicle found with that ID', 404));
+  }
 
-    // Check if the vehicle belongs to the current user
+  if (req.user.role !== 'superadmin' && req.user.role !== 'admin') {
     if (vehicle.user.toString() !== req.user.id) {
       return next(new AppError('You do not have permission to access this vehicle', 403));
     }
+  }
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        vehicle
-      }
-    });
+  res.status(200).json({
+    status: 'success',
+    data: {
+      vehicle
+    }
   });
+});
+
 
   /**
    * Update vehicle details
@@ -253,25 +255,28 @@ const geocodingService = require('../services/geocodingService');
    * Delete a vehicle
    * DELETE /api/vehicles/:id
    */
-  exports.deleteVehicle = catchAsync(async (req, res, next) => {
-    const vehicle = await Vehicle.findById(req.params.id);
+exports.deleteVehicle = catchAsync(async (req, res, next) => {
+  const vehicle = await Vehicle.findById(req.params.id);
 
-    if (!vehicle) {
-      return next(new AppError('No vehicle found with that ID', 404));
-    }
+  if (!vehicle) {
+    return next(new AppError('No vehicle found with that ID', 404));
+  }
 
-    // Check if the vehicle belongs to the current user
-    if (vehicle.user.toString() !== req.user.id) {
-      return next(new AppError('You do not have permission to delete this vehicle', 403));
-    }
+  const isOwner = vehicle.user?.toString() === req.user.id;
+  const isPrivileged = req.user.role === 'admin' || req.user.role === 'superadmin';
 
-    await Vehicle.findByIdAndDelete(req.params.id);
+  if (!isOwner && !isPrivileged) {
+    return next(new AppError('You do not have permission to delete this vehicle', 403));
+  }
 
-    res.status(204).json({
-      status: 'success',
-      data: null
-    });
+  await Vehicle.findByIdAndDelete(req.params.id);
+
+  res.status(204).json({
+    status: 'success',
+    data: null
   });
+});
+
 
   /**
    * Get vehicle statistics
@@ -337,7 +342,7 @@ const geocodingService = require('../services/geocodingService');
 exports.handleLiveVehicleData = async (data) => {
   try {
     const { IMEI, lat, lon, speedGps, ignition, gpsTimestamp, extendedData } = data;
-    if (!IMEI || !lat || !lon) return console.warn("Invalid GPS data", data);
+    if (!IMEI || lat === undefined || lon === undefined) return console.warn("Invalid GPS data", data);
 
     const vehicle = await Vehicle.findOne({ imei: IMEI }).populate('user');
     if (!vehicle) return console.warn(`Vehicle not found: ${IMEI}`);
@@ -361,12 +366,37 @@ exports.handleLiveVehicleData = async (data) => {
         : 'inactive';
     }
 
+    // Calculate heading BEFORE overwriting lastPosition
+    let heading = null;
+    const prev = vehicle.lastPosition;
+    if (
+      prev &&
+      prev.lat !== undefined &&
+      prev.lon !== undefined &&
+      prev.lat !== 0 &&
+      prev.lon !== 0 &&
+      lat !== 0 &&
+      lon !== 0
+    ) {
+      const toRad = (deg) => deg * (Math.PI / 180);
+      const toDeg = (rad) => rad * (180 / Math.PI);
+
+      const dLon = toRad(lon - prev.lon);
+      const y = Math.sin(dLon) * Math.cos(toRad(lat));
+      const x =
+        Math.cos(toRad(prev.lat)) * Math.sin(toRad(lat)) -
+        Math.sin(toRad(prev.lat)) * Math.cos(toRad(lat)) * Math.cos(dLon);
+      const brng = Math.atan2(y, x);
+      heading = (toDeg(brng) + 360) % 360;
+    }
+
     vehicle.lastPosition = {
       lat,
       lon,
       speed: speedGps || 0,
       timestamp,
       ignition: isIgnitionOn,
+      heading,
     };
 
     vehicle.extendedData = extendedData;
@@ -429,6 +459,7 @@ exports.handleLiveVehicleData = async (data) => {
       speed: speedGps,
       ignition: isIgnitionOn,
       timestamp,
+      heading,
       extendedData,
       insideGeofences: insideGeofences.map((g) => ({
         id: g._id,
@@ -444,4 +475,32 @@ exports.handleLiveVehicleData = async (data) => {
   }
 };
 
+// Reassign a vehicle to another user
+exports.reassignVehicle = async (req, res, next) => {
+  const { vehicleId } = req.params;
+  const { newUserId } = req.body;
+
+  try {
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    const newUser = await User.findById(newUserId);
+    if (!newUser) {
+      return res.status(404).json({ success: false, message: 'Target user not found' });
+    }
+
+    vehicle.user = newUserId;
+    await vehicle.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vehicle reassigned successfully',
+      data: vehicle,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 

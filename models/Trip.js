@@ -45,11 +45,14 @@ const tripSchema = new mongoose.Schema({
   },
   startLocation: locationPointSchema,
   endLocation: locationPointSchema,
-  // We don't store all route points here to keep the document size reasonable
-  // Detailed route points are stored in the positions collection
+
   summary: {
     distance: {
-      type: Number, // in kilometers
+      type: Number, // Distance calculated by backend (Haversine) in kilometers
+      default: 0
+    },
+    distanceFromOdometer: {
+      type: Number, // ✅ Real vehicle distance from Odometer (in meters or km, up to you)
       default: 0
     },
     duration: {
@@ -69,13 +72,14 @@ const tripSchema = new mongoose.Schema({
       default: 0
     },
     fuelUsed: {
-      type: Number, // in liters, if available
+      type: Number, // optional, in liters
     },
     positionsCount: {
       type: Number,
       default: 0
     }
   },
+
   startAddress: {
     type: String,
     trim: true
@@ -89,6 +93,7 @@ const tripSchema = new mongoose.Schema({
     trim: true
   },
   tags: [String],
+
   createdAt: {
     type: Date,
     default: Date.now
@@ -99,14 +104,14 @@ const tripSchema = new mongoose.Schema({
   }
 });
 
-// Add indexes for improved query performance
+// ✅ Indexes for performance
 tripSchema.index({ vehicle: 1, startTime: -1 });
 tripSchema.index({ user: 1, startTime: -1 });
 tripSchema.index({ status: 1 });
 tripSchema.index({ startTime: 1, endTime: 1 });
 
-// Pre-save hook to update the updatedAt field
-tripSchema.pre('save', function(next) {
+// ✅ Auto-update updatedAt before save
+tripSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

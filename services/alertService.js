@@ -2,6 +2,8 @@ const Alert = require("../models/Alert");
 const geocodingService = require("../services/geocodingService");
 const socket = require("../Utils/socket");
 const User = require("../models/User");
+const colors = require('colors');
+
 
 exports.createAlert = async function (vehicle, type, message, data = {}) {
   try {
@@ -17,7 +19,7 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       }
     }
 
-    // ✅ Auto-resolve opposite alert when entering or exiting
+    // Auto-resolve opposite geofence alerts
     if (data.geofenceId) {
       if (type === "GEOFENCE_EXIT") {
         await Alert.updateMany(
@@ -44,7 +46,7 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       }
     }
 
-    // Check for duplicate alerts
+    //  Prevent duplicate active alert of the same type
     const query = {
       vehicleId: vehicle._id,
       type,
@@ -57,9 +59,7 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
 
     const existing = await Alert.findOne(query);
     if (existing) {
-      console.log(
-        `[ALERT] Skipped duplicate alert ${type} for geofence ${data.geofenceId}`
-      );
+      console.log(`[ALERT] Skipped duplicate alert ${type} for geofence ${data.geofenceId}`);
       return;
     }
 
@@ -72,26 +72,24 @@ exports.createAlert = async function (vehicle, type, message, data = {}) {
       location,
     });
 
-try {
-  // Incrémenter pour le user du véhicule
-  await User.findByIdAndUpdate(vehicle.user._id, {
-    $inc: { alertCounter: 1 },
-  });
+    // Increment alert counters
+    try {
+      await User.findByIdAndUpdate(vehicle.user._id, { $inc: { alertCounter: 1 } });
 
-  // Incrémenter pour les autres admins/superadmins sauf ce user
-  await User.updateMany(
-    { role: { $in: ["admin", "superadmin"] }, _id: { $ne: vehicle.user._id } },
-    { $inc: { alertCounter: 1 } }
-  );
-} catch (err) {
-  console.error("[ALERT] Failed to increment alert counters:", err.message);
-}
+      await User.updateMany(
+        { role: { $in: ["admin", "superadmin"] }, _id: { $ne: vehicle.user._id } },
+        { $inc: { alertCounter: 1 } }
+      );
+    } catch (err) {
+      console.error("[ALERT] Failed to increment alert counters:", err.message);
+    }
 
+   console.log(`${colors.red('[ALERT]')} ${type} created for vehicle ${vehicle.name} on ${new Date().toLocaleString()}`);
 
 
-    console.log(`[ALERT] ${type} created for vehicle ${vehicle.name}`);
-
+    // Emit alert to all relevant users without duplication
     const io = socket.getIO();
+
     const alertPayload = {
       vehicleId: vehicle._id,
       vehicleName: vehicle.name,
@@ -103,8 +101,27 @@ try {
       data,
     };
 
-    io.to(vehicle.user._id.toString()).emit("alert", alertPayload);
-    io.to("admins").emit("alert", { ...alertPayload, user: vehicle.user });
+    const recipients = new Set();
+
+    // Add vehicle owner
+    recipients.add(vehicle.user._id.toString());
+
+    // Add all admins and superadmins (except vehicle owner)
+    const admins = await User.find(
+      { role: { $in: ["admin", "superadmin"] } },
+      "_id"
+    );
+
+    admins.forEach((admin) => {
+      if (admin._id.toString() !== vehicle.user._id.toString()) {
+        recipients.add(admin._id.toString());
+      }
+    });
+
+    // Send to each unique user
+    recipients.forEach((userId) => {
+      io.to(userId).emit("alert", alertPayload);
+    });
   } catch (err) {
     console.error("[ALERT] Error creating alert:", err.message);
   }
