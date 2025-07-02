@@ -255,25 +255,28 @@ exports.getVehicle = catchAsync(async (req, res, next) => {
    * Delete a vehicle
    * DELETE /api/vehicles/:id
    */
-  exports.deleteVehicle = catchAsync(async (req, res, next) => {
-    const vehicle = await Vehicle.findById(req.params.id);
+exports.deleteVehicle = catchAsync(async (req, res, next) => {
+  const vehicle = await Vehicle.findById(req.params.id);
 
-    if (!vehicle) {
-      return next(new AppError('No vehicle found with that ID', 404));
-    }
+  if (!vehicle) {
+    return next(new AppError('No vehicle found with that ID', 404));
+  }
 
-    // Check if the vehicle belongs to the current user
-    if (vehicle.user.toString() !== req.user.id) {
-      return next(new AppError('You do not have permission to delete this vehicle', 403));
-    }
+  const isOwner = vehicle.user?.toString() === req.user.id;
+  const isPrivileged = req.user.role === 'admin' || req.user.role === 'superadmin';
 
-    await Vehicle.findByIdAndDelete(req.params.id);
+  if (!isOwner && !isPrivileged) {
+    return next(new AppError('You do not have permission to delete this vehicle', 403));
+  }
 
-    res.status(204).json({
-      status: 'success',
-      data: null
-    });
+  await Vehicle.findByIdAndDelete(req.params.id);
+
+  res.status(204).json({
+    status: 'success',
+    data: null
   });
+});
+
 
   /**
    * Get vehicle statistics

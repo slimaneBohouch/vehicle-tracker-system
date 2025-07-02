@@ -1416,3 +1416,23 @@
 [02/07/2025 23:30:47] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
 [02/07/2025 23:30:59] [TCP] 🔌 Trying to connect to server...
 [02/07/2025 23:30:59] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[02/07/2025 23:32:41] [TCP] ❌ Socket Error: read ECONNRESET
+[02/07/2025 23:32:41] [TCP] ❌ Connection closed due to error
+[02/07/2025 23:32:41] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[02/07/2025 23:32:41] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[02/07/2025 23:32:46] [TCP] 🔌 Trying to connect to server...
+[02/07/2025 23:32:46] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[02/07/2025 23:39:02] [TCP] ❌ Socket Error: read ECONNRESET
+[02/07/2025 23:39:02] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[02/07/2025 23:39:02] [TCP] ❌ Connection closed due to error
+[02/07/2025 23:39:02] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[02/07/2025 23:39:07] [TCP] 🔌 Trying to connect to server...
+[02/07/2025 23:39:07] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[02/07/2025 23:40:32] [TCP] ❌ Socket Error: read ECONNRESET
+[02/07/2025 23:40:32] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 1/10)
+[02/07/2025 23:40:32] [TCP] ❌ Connection closed due to error
+[02/07/2025 23:40:32] [TCP] 🔁 Attempting reconnect in 5 seconds... (Attempt 2/10)
+[02/07/2025 23:40:37] [TCP] 🔌 Trying to connect to server...
+[02/07/2025 23:40:37] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
+[02/07/2025 23:47:07] [TCP] 🔌 Trying to connect to server...
+[02/07/2025 23:47:07] [TCP] ✅ Connected to TCP server at pogog.ovh:5050
