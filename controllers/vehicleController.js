@@ -472,5 +472,32 @@ exports.handleLiveVehicleData = async (data) => {
   }
 };
 
+// Reassign a vehicle to another user
+exports.reassignVehicle = async (req, res, next) => {
+  const { vehicleId } = req.params;
+  const { newUserId } = req.body;
 
+  try {
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    const newUser = await User.findById(newUserId);
+    if (!newUser) {
+      return res.status(404).json({ success: false, message: 'Target user not found' });
+    }
+
+    vehicle.user = newUserId;
+    await vehicle.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vehicle reassigned successfully',
+      data: vehicle,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 

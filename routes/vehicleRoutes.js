@@ -1,6 +1,6 @@
 const express = require('express');
 const vehicleController = require('../controllers/vehicleController');
-const { protect } = require('../middleware/auth');
+const { protect , authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,5 +18,7 @@ router
   .get(vehicleController.getVehicle)
   .patch(vehicleController.updateVehicle)
   .delete(vehicleController.deleteVehicle);
+
+router.put("/:vehicleId/reassign",protect,authorize("admin", "superadmin"), vehicleController.reassignVehicle);
 
 module.exports = router;
